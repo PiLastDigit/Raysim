@@ -1,6 +1,6 @@
 [project]
 name = "raysim"
-version = "0.0.1"
+version = "0.0.2"
 description = "3D Total Ionizing Dose (TID) sector-shielding simulator"
 readme = "README.md"
 requires-python = ">=3.11"
