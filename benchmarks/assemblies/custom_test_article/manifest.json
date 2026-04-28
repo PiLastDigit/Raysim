@@ -1,19 +1,19 @@
 {
   "files": {
     "aluminum": {
-      "n_triangles": 12,
+      "n_triangles": 24,
       "path": "benchmarks/assemblies/custom_test_article/aluminum.stl",
-      "sha256": "c41465c71b1afbca427153d789e3c879eda49c2e97cc248cb28e30321aeafec7"
+      "sha256": "b27c8712274fc990e6416db2d80f6e1229d7646c3da36d4e6e228f6d7e38c3dd"
     },
     "copper": {
       "n_triangles": 12,
       "path": "benchmarks/assemblies/custom_test_article/copper.stl",
-      "sha256": "ceed62f96b4ea601da847fef9651d11d565c9fd6666584f5546e30d5d3870498"
+      "sha256": "126436aad90be56503b3e3aa33f83c59c591d3b8e39ea0f27f5f884e33fa61e3"
     },
     "fr4": {
       "n_triangles": 12,
       "path": "benchmarks/assemblies/custom_test_article/fr4.stl",
-      "sha256": "3f425abb6fda1743b65511f82cb8ed1f040662945c681c2ea64b433a64218998"
+      "sha256": "42d2b20e589e7702031a7ad82f4c01ae4864299e8cc9622c9893ffff013704dc"
     },
     "gaas": {
       "n_triangles": 12,

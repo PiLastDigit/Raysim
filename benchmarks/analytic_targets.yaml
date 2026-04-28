@@ -2,10 +2,16 @@
 #
 # All densities in g/cm³ (per MVP_PLAN §3 I/O units), thicknesses in mm, and
 # the resulting ∑ρL in g/cm². Phase A acceptance: relative error ≤ 1e-5 vs. these
-# closed-form values on the principal axes.
+# closed-form values for rays whose hit points coincide exactly with mesh
+# vertices (cube faces; uv_sphere ±Z poles).
 #
-# Reference densities below are the MVP defaults; final values are pulled from
-# the material library at run time (B2.1).
+# Off-axis rays through *any* triangulated sphere have an O(edge²/R) sagitta
+# error and are intentionally NOT in the 1e-5 acceptance set. Use the box
+# fixtures for arbitrary-angle 1e-5 tests; box faces are exact at any angle.
+#
+# Reference densities are the MVP defaults; tests recompute ∑ρL from
+# `chord_lengths_mm` × `defaults.densities_g_cm3` so the YAML stays the
+# *geometric* truth and densities can drift independently in the library.
 
 defaults:
   densities_g_cm3:
@@ -18,8 +24,8 @@ geometries:
 
   aluminum_box:
     description: |
-      Solid 100 mm Al cube centered at origin. Principal-axis ray entering the
-      +Z face at the centroid traverses the full 100 mm in Al, exiting on -Z.
+      Solid 100 mm Al cube centered at origin. Box faces are flat — chord
+      length is analytically exact at any ray angle, including off-axis.
     rays:
       - origin: [0, 0, 200]
         direction: [0, 0, -1]
@@ -29,8 +35,10 @@ geometries:
 
   solid_sphere:
     description: |
-      Solid 50 mm-radius Al sphere. Ray with impact parameter d (perpendicular
-      offset from the sphere center) traverses 2 √(R²−d²) of Al.
+      Solid 50 mm-radius Al sphere. Built as ``uv_sphere`` so the ±Z poles
+      are exact mesh vertices — only the principal-axis ray is in the 1e-5
+      acceptance set. Off-axis rays have O(edge²/R) sagitta error and are
+      excluded from this YAML by design.
     sphere:
       radius_mm: 50.0
       material: aluminum
@@ -41,18 +49,14 @@ geometries:
         chord_lengths_mm:
           aluminum: 100.0
         sigma_rho_l_g_cm2: 27.0
-      - origin: [25, 0, 200]
-        direction: [0, 0, -1]
-        impact_mm: 25.0
-        chord_lengths_mm:
-          aluminum: 86.6025403784   # 2 √(50² − 25²)
-        sigma_rho_l_g_cm2: 23.382686
 
   concentric_shell:
     description: |
-      Outer Al sphere R=50 mm with inner Cu sphere R=20 mm, concentric. A radial
-      ray traverses Al from R=50 → R=20, then Cu from R=20 → -20, then Al from
-      -20 → -50. Ray with impact d > 20 mm misses the Cu core.
+      Hollow Al shell (R=20→50) enclosing a solid Cu sphere (R=20).
+      Built so all four pole crossings (±Z on R=20 and R=50) are exact mesh
+      vertices — the principal-axis chord is analytically exact and the inner
+      Al cavity face is *coincident* with the Cu outer face by design,
+      exercising A.4's tied-batch / B1.5's ``contact_only`` path.
     rays:
       - origin: [0, 0, 200]
         direction: [0, 0, -1]
@@ -60,15 +64,24 @@ geometries:
         chord_lengths_mm:
           aluminum: 60.0    # 2 × (50 − 20)
           copper: 40.0      # 2 × 20
-        sigma_rho_l_g_cm2: 51.86       # 0.06×2.70×100 (Al, in g/cm²) wait no — 60 mm × 2.70 g/cm³ = 16.2 g/cm² + 40 mm × 8.96 = 35.84 → 52.04
-        # NB: keep single-source-of-truth in code, not here. Tests recompute from densities.
-      - origin: [30, 0, 200]
+        sigma_rho_l_g_cm2: 52.04   # 6.0 × 2.70 + 4.0 × 8.96
+
+  custom_test_article:
+    description: |
+      Multi-material test article. Outer Al box is a true hollow shell
+      (2 mm wall, 196 mm cavity) — a center-of-face +Z ray traverses 2 mm Al
+      (top wall) + air-gap to PCB + 1.6 mm FR4 + air-gap to battery +
+      20 mm Cu (battery) + air-gap to bottom + 2 mm Al (bottom wall).
+      The 0.5 mm GaAs solar panel sits *outside* the +Z face.
+    rays:
+      - origin: [0, 0, 300]
         direction: [0, 0, -1]
-        impact_mm: 30.0
         chord_lengths_mm:
-          aluminum: 80.0    # 2 √(50² − 30²)
-          copper: 0.0       # misses 20-mm core
-        sigma_rho_l_g_cm2: 21.6        # 80 mm × 2.70 g/cm³
+          gaas: 0.5         # solar panel outer
+          aluminum: 4.0     # 2 mm top wall + 2 mm bottom wall
+          copper: 20.0      # battery
+          fr4: 1.6          # PCB
+        sigma_rho_l_g_cm2: 19.562   # 0.05×5.32 + 0.4×2.70 + 2.0×8.96 + 0.16×1.85
 
 # Conventions:
 #   * ∑ρL is computed as sum_i (chord_length_mm_i / 10) × density_i_g_cm3.
