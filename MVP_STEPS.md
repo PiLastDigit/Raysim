@@ -18,13 +18,13 @@ Use this section as the working tracker. Keep the detailed step definitions belo
 - [x] 0.5 — Phase-0 decision write-up
 
 ### Phase A
-- [ ] A.1 — Project schemas
-- [ ] A.2 — DDC import and log-cubic spline
-- [ ] A.3 — Scene loader and Embree BVH
-- [ ] A.4 — HEALPix ray generator and iterative closest-hit traversal
-- [ ] A.5 — Per-detector aggregation and per-species breakdown
-- [ ] A.6 — CLI and run output
-- [ ] A.7 — Acceptance test suite and performance baseline
+- [x] A.1 — Project schemas
+- [x] A.2 — DDC import and log-cubic spline
+- [x] A.3 — Scene loader and Embree BVH
+- [x] A.4 — HEALPix ray generator and iterative closest-hit traversal
+- [x] A.5 — Per-detector aggregation and per-species breakdown
+- [x] A.6 — CLI and run output
+- [x] A.7 — Acceptance test suite and performance baseline
 
 ### Phase B1
 - [ ] B1.1 — STEP loader with assembly tree
