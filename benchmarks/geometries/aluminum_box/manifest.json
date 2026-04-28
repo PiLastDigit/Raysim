@@ -1,0 +1,9 @@
+{
+  "files": {
+    "aluminum": {
+      "n_triangles": 12,
+      "path": "benchmarks/geometries/aluminum_box/aluminum.stl",
+      "sha256": "9066dcd1b305db59c227609aed92606a5ee9b12b21e42f33ad517a1da222f1fa"
+    }
+  }
+}

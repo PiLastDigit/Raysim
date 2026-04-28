@@ -1,0 +1,14 @@
+{
+  "files": {
+    "aluminum": {
+      "n_triangles": 5120,
+      "path": "benchmarks/geometries/concentric_shell/aluminum.stl",
+      "sha256": "2fc92df4447e0ed2aa2677ab4a183242f02269d8597914b7bd1018733f85eda4"
+    },
+    "copper": {
+      "n_triangles": 1280,
+      "path": "benchmarks/geometries/concentric_shell/copper.stl",
+      "sha256": "5366785283266ad874246d826d352f6597e1d0aee47344a0ad3e53f9c816976f"
+    }
+  }
+}
