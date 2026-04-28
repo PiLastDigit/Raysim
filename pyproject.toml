@@ -1,0 +1,93 @@
+[project]
+name = "raysim"
+version = "0.0.1"
+description = "3D Total Ionizing Dose (TID) sector-shielding simulator"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "RaySim", email = "samir@gamaspace.com" }]
+
+dependencies = [
+    "numpy>=1.26,<3.0",
+    "scipy>=1.11",
+    "pydantic>=2.6",
+    "click>=8.1",
+    "structlog>=24.1",
+    "trimesh>=4.0",
+]
+
+[project.optional-dependencies]
+ray = [
+    "embreex>=2.17",
+    # healpy is optional: vendored NumPy `pix2vec` fallback exists per MVP_PLAN §4.3.
+    "healpy>=1.16; platform_system != 'Windows'",
+]
+geom = [
+    # pythonocc-core is not on PyPI; install via conda. Listed here for documentation only.
+    # See docs/decisions/phase-0.md for the install path.
+]
+ui = [
+    "PySide6>=6.6",
+    "matplotlib>=3.8",
+    "pyqtgraph>=0.13",
+]
+report = [
+    "reportlab>=4.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-benchmark>=4.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+    "pyyaml>=6.0",
+    "types-pyyaml",
+]
+
+[project.scripts]
+raysim = "raysim.cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/raysim"]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+# RUF001/2/3 flag legitimate physics symbols (ρ, ×, ∑, …); the whole project
+# uses them in docstrings and comments by design.
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["N802", "N803", "N806"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+files = ["src/raysim"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: marks tests that take more than a few seconds",
+    "benchmark: performance regression tests (pytest-benchmark)",
+    "needs_embree: requires embreex installed",
+    "needs_healpy: requires healpy installed (else use vendored pix2vec)",
+    "needs_occt: requires pythonocc-core installed",
+]
+
