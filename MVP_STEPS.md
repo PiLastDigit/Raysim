@@ -11,11 +11,11 @@ Step IDs are stable references (`A.3`, `B2.4`, etc.) so they can be cited in com
 Use this section as the working tracker. Keep the detailed step definitions below as the source of truth for scope and "done when" criteria.
 
 ### Phase 0
-- [ ] 0.1 — Repository scaffold and tooling
-- [ ] 0.2 — Dependency bring-up and smoke tests
-- [ ] 0.3 — OMERE `.dos` format characterization and `omere_dos` importer
-- [ ] 0.4 — Benchmark corpus and canonical test geometries
-- [ ] 0.5 — Phase-0 decision write-up
+- [x] 0.1 — Repository scaffold and tooling
+- [x] 0.2 — Dependency bring-up and smoke tests
+- [x] 0.3 — OMERE `.dos` format characterization and `omere_dos` importer
+- [x] 0.4 — Benchmark corpus and canonical test geometries
+- [x] 0.5 — Phase-0 decision write-up
 
 ### Phase A
 - [ ] A.1 — Project schemas
