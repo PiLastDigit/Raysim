@@ -52,7 +52,9 @@ def _emit_manifest(out_dir: Path, files: dict[str, Path]) -> None:
             for name, p in files.items()
         }
     }
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +169,7 @@ def main() -> int:
         m = sub / "manifest.json"
         if not m.exists():
             continue
-        data = json.loads(m.read_text())
+        data = json.loads(m.read_text(encoding="utf-8"))
         for name, info in sorted(data["files"].items()):
             print(f"    {sub.name}/{name}: {info['sha256'][:12]}…  ({info['n_triangles']} tri)")
     return 0

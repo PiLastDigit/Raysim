@@ -33,7 +33,7 @@ def test_geometry_dir_has_manifest(subdir: Path) -> None:
     assert subdir.exists(), f"missing {subdir} — run scripts/build_benchmarks.py"
     manifest = subdir / "manifest.json"
     assert manifest.exists()
-    data = json.loads(manifest.read_text())
+    data = json.loads(manifest.read_text(encoding="utf-8"))
     assert data["files"], f"empty manifest for {subdir}"
     for info in data["files"].values():
         stl = REPO / info["path"]
@@ -44,7 +44,7 @@ def test_geometry_dir_has_manifest(subdir: Path) -> None:
 
 
 def test_analytic_targets_loadable() -> None:
-    data = yaml.safe_load(TARGETS.read_text())
+    data = yaml.safe_load(TARGETS.read_text(encoding="utf-8"))
     assert "geometries" in data
     assert "aluminum_box" in data["geometries"]
     assert "solid_sphere" in data["geometries"]
@@ -53,7 +53,7 @@ def test_analytic_targets_loadable() -> None:
 
 def test_analytic_targets_internally_consistent() -> None:
     """∑ρL listed in the YAML matches sum(chord_mm/10 × ρ_g_cm3) over species."""
-    data = yaml.safe_load(TARGETS.read_text())
+    data = yaml.safe_load(TARGETS.read_text(encoding="utf-8"))
     densities = data["defaults"]["densities_g_cm3"]
     for gname, gdata in data["geometries"].items():
         for ray in gdata.get("rays", []):
