@@ -6,6 +6,68 @@ Step IDs are stable references (`A.3`, `B2.4`, etc.) so they can be cited in com
 
 ---
 
+## Progress checklist
+
+Use this section as the working tracker. Keep the detailed step definitions below as the source of truth for scope and "done when" criteria.
+
+### Phase 0
+- [ ] 0.1 — Repository scaffold and tooling
+- [ ] 0.2 — Dependency bring-up and smoke tests
+- [ ] 0.3 — OMERE `.dos` format characterization and `omere_dos` importer
+- [ ] 0.4 — Benchmark corpus and canonical test geometries
+- [ ] 0.5 — Phase-0 decision write-up
+
+### Phase A
+- [ ] A.1 — Project schemas
+- [ ] A.2 — DDC import and log-cubic spline
+- [ ] A.3 — Scene loader and Embree BVH
+- [ ] A.4 — HEALPix ray generator and iterative closest-hit traversal
+- [ ] A.5 — Per-detector aggregation and per-species breakdown
+- [ ] A.6 — CLI and run output
+- [ ] A.7 — Acceptance test suite and performance baseline
+
+### Phase B1
+- [ ] B1.1 — STEP loader with assembly tree
+- [ ] B1.2 — Tessellation pipeline
+- [ ] B1.3 — Healing and orientation normalization
+- [ ] B1.4 — Per-solid-shell watertightness validator
+- [ ] B1.5 — Overlap and interference diagnostic
+- [ ] B1.6 — Stage A adapter and STL export
+
+### Phase B2
+- [ ] B2.1 — Material library
+- [ ] B2.2 — STEP AP214_IS material-tag ingestion
+- [ ] B2.3 — Naming-rules auto-assignment
+- [ ] B2.4 — Auto-assignment review
+- [ ] B2.5 — Project file format
+- [ ] B2.6 — Run gating and density anomaly warnings
+
+### Phase B3
+- [ ] B3.1 — Main window shell
+- [ ] B3.2 — OCCT AIS viewer integration with picking
+- [ ] B3.3 — Material assignment UI
+- [ ] B3.4 — Detector placement
+- [ ] B3.5 — Scenario panel
+- [ ] B3.6 — Run dispatcher
+- [ ] B3.7 — Result overlays
+
+### Phase B4
+- [ ] B4.1 — Report data model and PDF generator
+- [ ] B4.2 — CSV exports
+- [ ] B4.3 — JSON scenario bundle and reopen-reproduces
+- [ ] B4.4 — Installer build
+- [ ] B4.5 — Clean-machine install verification
+
+### Phase B5
+- [ ] B5.1 — Canonical analytic validation
+- [ ] B5.2 — Cross-tool reference comparison
+- [ ] B5.3 — Nightly regression infrastructure
+- [ ] B5.4 — Performance benchmarking and tuning
+- [ ] B5.5 — UX hardening
+- [ ] B5.6 — Validation dossier
+
+---
+
 ## Phase 0 — Spikes and gates
 
 Goal: de-risk and decide before any Phase A code lands on `main`.
