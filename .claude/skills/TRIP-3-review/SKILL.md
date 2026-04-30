@@ -5,44 +5,35 @@ disable-model-invocation: true
 argument-hint: "version or feature to review"
 ---
 
-# Review Mode
-
-You are now in **code review mode** for **RaySim**.
+# Review Mode — RaySim
 
 Review: $ARGUMENTS
 
-## Prerequisites - Read First
+## Prerequisites
 
-Before reviewing, you MUST read:
-
-1. @docs/ARCHI.md - Verify architectural compliance
-2. Related plan file in `docs/1-plans/` - Confirm implementation matches design
-3. Related changelog entry in `docs/2-changelog/`
-4. @.codex/skills/TRIP-3-review/checklist.md - the **single source of truth** for review criteria, severity classification, and the approval gate. The codex-driven review path (`.claude/skills/codex-code-review`) reads the same file, so the two review surfaces stay aligned by construction.
-
----
-
-## How to apply the checklist
-
-Walk every section of `checklist.md` against the code change in scope. Tick each item that passes. Items that don't pass become findings, classified by the severity scale in the same file. Approval requires the "Review Completion Criteria (Approval Gate)" at the bottom of `checklist.md` to be satisfied.
-
-Do **not** copy the checklist into your review output — link to it. The CR file template below has its own short summary checklist.
+Read before reviewing:
+1. @docs/ARCHI.md — verify architectural compliance
+2. Related plan in `docs/1-plans/`
+3. Related changelog in `docs/2-changelog/`
+4. @.codex/skills/TRIP-3-review/checklist.md — **single source of truth** for review criteria, severity classification, and approval gate
 
 ---
 
-## Post-Review: Create Review File
+## Apply the Checklist
 
-After completing the review, create a summary file in `docs/3-code-review/`.
+Walk every section of `checklist.md` against the change. Tick passing items. Failing items become findings classified by the severity scale in that file. Approval requires the gate at the bottom of `checklist.md`.
 
-**File naming**: `CR_wa_vx.y.z.md` (a=project week, x.y.z=version)
+Do not copy the checklist into output — link to it.
 
-**Format**: render the canonical skeleton from `@.codex/skills/TRIP-3-review/cr-template.md`. That file is the single source of truth for the CR markdown structure — both this human-driven path and the Codex iteration loop's synthesize step write output that conforms to it, so a future reader can compare them apples-to-apples.
+---
 
-Workflow:
+## Create Review File
 
-1. Open `.codex/skills/TRIP-3-review/cr-template.md` and copy the markdown block out (the part between the triple backticks).
-2. Save it to `docs/3-code-review/CR_wa_vx.y.z.md`.
-3. Replace every `<angle-bracket placeholder>` with concrete content from your review.
-4. Tick the boxes (`[x]`) for the 10 checklist items that passed cleanly; leave unchecked with a one-line caveat for the rest.
+Save to `docs/3-code-review/CR_wa_vx.y.z.md` (a=project week, x.y.z=version).
 
-**Important:** every checklist item must be ticked or annotated. If you didn't check a point for any reason, add a one-line caveat explaining why. A silent unchecked box is a red flag for a future reader.
+Render the skeleton from `@.codex/skills/TRIP-3-review/cr-template.md`:
+1. Copy the markdown block from that file.
+2. Replace every `<angle-bracket placeholder>` with concrete content.
+3. Tick `[x]` for passing checklist items; leave unchecked with a one-line caveat otherwise.
+
+Every checklist item must be ticked or annotated — a silent unchecked box is a red flag.

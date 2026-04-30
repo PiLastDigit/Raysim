@@ -4,311 +4,187 @@ description: Plan a new feature following project standards
 argument-hint: "describe the feature you want to build"
 ---
 
-# Planning Mode
+# Planning Mode — RaySim
 
-You are now in **planning mode** for **RaySim**.
+## Prerequisites
 
-## Prerequisites - Read First
+Read ALL lines of @docs/ARCHI.md before creating any plan.
 
-Before creating any plan, you MUST read ALL THE LINES of:
+## Task
 
-1. @docs/ARCHI.md - Understand current system architecture
-
-## Your Task
-
-Plan the following feature: $ARGUMENTS
+Plan: $ARGUMENTS
 
 ---
 
-## Step 1: Discovery & Clarification (Interactive)
+## Step 1: Discovery (Interactive)
 
-**Do NOT start writing a plan immediately.** First, engage in a discovery conversation to fully understand the user's intent.
+Do NOT write the plan yet. First clarify the feature with the user.
 
-### 1.1 Initial Understanding
+Summarize your understanding in 2-3 sentences, then use `AskUserQuestion` with 2-4 concrete options covering scope, behavior, constraints, and priority.
 
-After reading the feature request, summarize your understanding in 2-3 sentences, then **use the `AskUserQuestion` tool** to present clarifying questions with structured options.
-
-Frame questions around:
-
-- **Scope**: What's included vs excluded?
-- **Behavior**: How should it work from the user's perspective?
-- **Constraints**: Any technical limitations, deadlines, or dependencies?
-- **Priority**: What's most important if trade-offs are needed?
-
-For each question, provide 2-4 concrete options based on your analysis of the codebase and the feature request. Always let the user provide custom input via the built-in "Other" option.
-
-### 1.2 Iterate Until Clear
-
-After user answers, either:
-
-- **Ask follow-up questions** using the `AskUserQuestion` tool if new ambiguities emerged
-- **Propose an approach** and **use the `AskUserQuestion` tool** to confirm:
-  - **Question**: "Based on your answers, I'm thinking the approach would be: [brief description]. Does this align with what you have in mind?"
-  - **Options**: "Yes, proceed" (approach looks good), "Adjust" (I have modifications to suggest)
+Iterate until clear. When ready, propose an approach and confirm via `AskUserQuestion`: "Based on your answers, the approach would be: [brief]. Does this align?" Options: "Yes, proceed" / "Adjust".
 
 ---
 
-## Step 2: Plan Document Creation
-
-Once understanding is confirmed, create the plan document.
+## Step 2: Create Plan Document
 
 ### File Naming
 
-Depending on the feature (major, minor, patch), propose a new version using SemVer (x.y.z) and create:
-`docs/1-plans/F_[version]_[feature-name].plan.md`
+Propose SemVer version, create: `docs/1-plans/F_[version]_[feature-name].plan.md`
 
-### Required Sections
+### Template
 
 ```markdown
 # [Feature Name] Implementation Plan
 
 ## Overview
-
-[2-4 sentences describing the feature and its purpose]
+[2-4 sentences: feature and purpose]
 
 ## Problem Statement (if applicable)
-
-[Current limitations/issues this feature addresses]
+[Current limitations this addresses]
 
 ## Solution Architecture
-
 [High-level design approach]
 
 ## Implementation Details
 
 ### 1. [Component/Module/File Name]
-
 **File**: `path/to/file`
-
-[Detailed description of changes needed]
+[Detailed description of changes]
 
 **Current state** (if modifying existing):
-[Describe what currently exists]
+[What currently exists]
 
 **Modifications**:
-
 - Specific change 1 (around line X)
 - Specific change 2 (around line Y)
 
-### 2. [Next Component/Module/File]
-
-[Continue with same pattern]
+### 2. [Next Component]
+[Same pattern]
 
 ## Technical Considerations
-
-- **Pattern Usage**: Which existing patterns to follow (from ARCHI.md §5 Core Architecture Principles).
-- **Determinism Impact**: Does this change affect `run.json` bit-identity? If yes: ordered reductions preserved? canonical JSON used for any new output? new inputs added to `Provenance` hashes? schema_version bump needed? (See ARCHI §14 — this is a contract, not a goal.)
-- **Numerical Precision**: If touching the ray engine or dose math, what's the float32 / float64 boundary? Does the eps-gap accounting still hold? Does the change risk the A.7 1e-5 hard gate? (See ARCHI §15.)
-- **Material Physics Scope**: MVP uses `density_g_cm3` only; everything else (`z_eff`, composition) is metadata. If a plan reaches for those fields in the dose math, that's a scope expansion and needs explicit justification.
-- **Coincident-Face / Tied-Batch**: Any change to scene loading, BVH building, or traversal must preserve the tied-batch invariants (ARCHI §11). embreex 4.4 has no filter callback — pre-built groups are mandatory.
-- **Backend Optionality**: `embreex`, `healpy`, `pythonocc-core` are optional dependencies. Code that uses them must guard with `pytest.importorskip` (tests) or document the extra in the install path.
-- **Schema Versioning**: Breaking changes to `proj.schema` or `env.schema` require a `SCHEMA_VERSION` bump. Document the v_old → v_new diff in the plan.
-- **Edge Cases**: Empty stacks, missing solids, negative thicknesses, pure-zero species columns, t = 0 LOS rays, max-hit safety cap.
+- **Pattern Usage**: Which existing patterns to follow (ARCHI.md §5).
+- **Determinism Impact**: Does this affect `run.json` bit-identity? Ordered reductions? Canonical JSON? `Provenance` hashes? Schema_version bump? (ARCHI §14)
+- **Numerical Precision**: Float32/64 boundary? eps-gap accounting? A.7 1e-5 hard gate? (ARCHI §15)
+- **Material Physics Scope**: MVP uses `density_g_cm3` only; `z_eff`/composition in dose math = scope expansion needing justification.
+- **Coincident-Face / Tied-Batch**: Scene/BVH/traversal changes must preserve tied-batch invariants (ARCHI §11). embreex 4.4 has no filter callback.
+- **Backend Optionality**: `embreex`, `healpy`, `pythonocc-core` are optional. Guard with `pytest.importorskip` (tests) or document the extra.
+- **Schema Versioning**: Breaking `proj.schema`/`env.schema` changes require `SCHEMA_VERSION` bump. Document v_old → v_new diff.
+- **Edge Cases**: Empty stacks, missing solids, negative thicknesses, pure-zero species, t=0 LOS rays, max-hit safety cap.
 
 ## Files to Modify/Create
-
-[Comprehensive numbered list with purposes]
-
-1. `path/to/file1` (modify) - Purpose description
-2. `path/to/file2` (new) - Purpose description
+1. `path/to/file1` (modify) - Purpose
+2. `path/to/file2` (new) - Purpose
 
 ## Type Definitions (if applicable)
-
-[New types, interfaces, structs, or modifications to existing ones]
+[New/modified types]
 
 ## Performance & Cost Impact (if applicable)
-
-[Expected performance implications]
+[Expected implications]
 
 ## Backward Compatibility (if applicable)
-
-[Migration strategy if needed]
+[Migration strategy]
 
 ## To-dos
 
-### Phase 1: [Phase Name] (if multiple phases are needed) or simply skip title if only one phase is needed
-
+### Phase 1: [Name] (skip title if single phase)
 - [ ] Task description
 - [ ] Another task
 
-### Phase 2: [Phase Name] (if applicable)
-
+### Phase 2: [Name] (if applicable)
 - [ ] Task description
-- [ ] Another task
 
-**Note**: For simple plans, a single phase is sufficient. Split into multiple phases only for complex features requiring sequential implementation.
-
-**Note**: Testing is OUT OF SCOPE for planning - will be handled separately.
+**Note**: Single phase is sufficient for simple plans. Testing is OUT OF SCOPE.
 ```
 
-## Quality Standards
+### Quality Standards
 
-- **Zero Ambiguity**: Every step must be clear and actionable
-- **File-Level Specificity**: List exact files and functions to modify
-- **Architecture Alignment**: Must conform to existing patterns in ARCHI.md
-- **Risk Assessment**: Highlight potential failure points
+Every step must be actionable with file-level specificity. Must conform to ARCHI.md patterns. Highlight potential failure points.
 
 ---
 
-## Step 3: Codex Second-Opinion Review (Iterative)
+## Step 3: Codex Second-Opinion Review
 
-Before showing the plan to the user for final review, run the **`codex-plan-review`** skill on the plan document and iterate until Codex returns `APPROVED` or the iteration cap is reached. Codex catches correctness, coherence, and completeness gaps that are easy to miss on a first draft — letting it surface those *before* the user sees the plan keeps the user-facing review focused on intent, scope, and priorities rather than mechanical issues.
+Before the user sees the plan, run the Codex plan review loop.
 
-### 3.1 Confirm with the user
+### Confirm
 
-**Use the `AskUserQuestion` tool** before kicking off the loop:
+`AskUserQuestion`: "I'll run Codex as a second-opinion reviewer and iterate until clean. Proceed?"
+Options: "Yes, run Codex review" (recommended) / "Skip Codex, go to user review" / "Cap iterations at N"
 
-- **Question**: "I'll run the Codex CLI as a second-opinion reviewer on the plan and iterate until it's clean. Proceed?"
-- **Options**:
-  - **"Yes, run Codex review"** (Recommended) — start the loop.
-  - **"Skip Codex, go straight to user review"** — jump to Step 4.
-  - **"Cap iterations at N"** — let the user pick a tighter bound than the default of 5.
+Skip for trivial plans (single-file, low-risk). Run for non-trivial (new module, schema/algorithm change).
 
-For trivial plans (single-file change, low-risk patch) the user may prefer to skip. For non-trivial plans (any new module, schema change, algorithm change) the loop is worth it.
+### Loop
 
-### 3.2 The iteration loop
+1. **Start**: `bash .claude/skills/codex-plan-review/scripts/start.sh --prompt-file .claude/skills/codex-plan-review/prompts/start.tpl <plan-path>`
+2. **Parse trailing tag**: `APPROVED` → Step 4. `NEEDS_REWORK` → surface to user. `REQUEST_CHANGES` → continue.
+3. **Address findings critically** — quote each P1/P2, push back on incorrect ones, fix legitimate ones by editing the plan in place.
+4. **Resume**: `bash .claude/skills/codex-plan-review/scripts/resume.sh --prompt-file .claude/skills/codex-plan-review/prompts/resume.tpl <plan-path>` → back to step 2.
+5. **Cap at 5 rounds** (or user-specified). Surface remaining findings and let user decide.
 
-1. **Turn 1**: start a fresh Codex thread on the plan:
-   ```
-   bash .claude/skills/codex-plan-review/scripts/start.sh \
-       --prompt-file .claude/skills/codex-plan-review/prompts/start.tpl \
-       docs/1-plans/F_x.y.z_feature-name.plan.md
-   ```
-   The script writes the review to its per-plan state file and prints it to stdout. Read the review.
-
-2. **Parse the trailing tag**:
-   - `APPROVED` → exit the loop, move to Step 4.
-   - `REQUEST_CHANGES` → continue to step 3.
-   - `NEEDS_REWORK` → stop the loop and surface to the user (the plan has structural issues that warrant a conversation, not mechanical fixes).
-
-3. **Address findings critically**. For each `P1` / `P2` finding:
-   - Quote the finding to the user in your response.
-   - Engage critically — not every Codex finding is correct. Push back on ones you disagree with by noting your reasoning; apply the legitimate ones by editing the plan file in place.
-   - Do not blindly apply suggestions; the user is the final arbiter of design choices, but you are responsible for the mechanical correctness within those choices.
-
-4. **Turn 2+**: invoke the resume helper:
-   ```
-   bash .claude/skills/codex-plan-review/scripts/resume.sh \
-       --prompt-file .claude/skills/codex-plan-review/prompts/resume.tpl \
-       docs/1-plans/F_x.y.z_feature-name.plan.md
-   ```
-   Codex re-reads the plan, confirms each prior finding's status, and flags new issues. Loop back to step 2.
-
-5. **Iteration cap**: by default, stop after **5 rounds** even if not yet `APPROVED`. Surface to the user with a summary of remaining open findings and let them decide whether to push for another round, accept the current state, or rework. Adjust this cap if the user picked a different value in Step 3.1.
-
-### 3.3 Operating notes
-
-- **Surface Codex's review verbatim** to the user each round, not just your interpretation. They want to see what the second reviewer said.
-- **Keep your edits scoped to the addressed findings.** Don't bundle unrelated cleanups during the loop — that makes the next re-review noisy.
-- **If Codex repeatedly raises the same finding** despite your edits, re-read the finding carefully — usually you addressed an adjacent concern but not the one Codex flagged. State your understanding back, then either fix the actual issue or push back if you think Codex is misreading.
-- **Reset the thread** (`bash .claude/skills/codex-plan-review/scripts/reset.sh <plan-path>`) only if the thread context has become genuinely confused (e.g., you renamed sections substantially mid-loop and Codex keeps citing stale line numbers). Resetting loses prior context and starts the loop over.
-- **Don't run Codex review on plans where the user explicitly said "skip"** — respect their judgment.
+Surface Codex reviews verbatim. Keep edits scoped to findings. Reset thread (`reset.sh <plan-path>`) only if context is genuinely confused.
 
 ---
 
-## Step 4: User Review & Validation
+## Step 4: User Review
 
-After Codex review converges (or is skipped), present a summary to the user including:
+Present summary: feature name, approach (1-2 sentences), files affected, complexity (simple/moderate/complex), Codex status.
 
-- **Feature**: [name]
-- **Approach**: [1-2 sentences]
-- **Files affected**: [count] files ([list key ones])
-- **Estimated complexity**: [simple/moderate/complex]
-- **Codex review status**: [APPROVED after N rounds | skipped | capped at N rounds with M open findings]
+`AskUserQuestion`: "Review the plan at `<path>`. How to proceed?"
+Options: "Approved" / "Request changes" / "Needs rework"
 
-Then **use the `AskUserQuestion` tool** to collect feedback:
-
-- **Question**: "Please review the plan at `docs/1-plans/F_x.y.z_feature-name.plan.md`. How would you like to proceed?"
-- **Options**: "Approved" (ready for implementation), "Request changes" (I have modifications), "Needs rework" (significant issues to address)
-
-Handle feedback:
-
-- **If "Request changes"**: Update the plan and re-present using `AskUserQuestion` again. If the changes are substantive, consider running another short Codex review pass on the edits.
-- **If "Needs rework"**: Discuss issues, rework the plan, and re-present
-- **If "Other" (custom input)**: Handle accordingly
-- **If "Approved"**: **Use the `AskUserQuestion` tool** to ask:
-  - **Question**: "Plan approved. Would you like to start implementation now?"
-  - **Options**: "Yes, implement now" (proceed with `TRIP-2-implement` using this plan), "Not yet" (I'll implement later)
+- **Request changes**: update plan, re-present. Run another Codex pass if changes are substantive.
+- **Needs rework**: discuss, rework, re-present.
+- **Approved**: ask "Plan approved. Start implementation now?" Options: "Yes, implement now" (→ TRIP-2-implement) / "Not yet"
 
 ---
 
-## IMPORTANT: No Code Implementation
+## No Code Implementation
 
-**DO NOT write code snippets or implement anything during planning.**
-
-This is a high-level planning phase only. Your plan should describe:
-
-- WHAT needs to be done (features, changes, structures)
-- WHERE changes will happen (files, modules, functions)
-- WHY certain approaches are chosen (trade-offs, rationale)
-
-But NOT:
-
-- Actual code implementations
-- Detailed algorithm code
-
-Keep it architectural and descriptive. Code comes in the `TRIP-2-implement` phase.
+Do NOT write code during planning. Describe WHAT, WHERE, and WHY — not HOW in code.
 
 ---
 
 ## Per-Component Planning Guidance
 
-The major architectural surfaces in RaySim each carry their own set of required-analysis items. Pick the section(s) that match the change.
+Pick sections matching the change.
 
-### For new ray-engine work (`raysim.ray.tracer`, `raysim.ray.scene`)
-
-Required analysis:
-
-- Stack-accumulator semantics: does the change preserve the entry-on-negative-dot / exit-on-positive-dot invariant?
-- Tie-batch handling: any new way a batch can form? Sort order still `(geom_id, prim_id)` ascending?
+### Ray-engine (`raysim.ray.tracer`, `raysim.ray.scene`)
+- Stack-accumulator: entry on negative-dot / exit on positive-dot invariant preserved?
+- Tie-batch: new batch formation? Sort order still `(geom_id, prim_id)` ascending?
 - eps-gap correction still applied after every batch?
 - Termination invariants (stack_leak, overlap_suspicious, max_hit)?
-- A.7 1e-5 hard gate impact (concentric-shell, principal-axis): pass/fail prediction and how to verify.
-- Float32 / float64 boundary: where does the precision cliff sit?
+- A.7 1e-5 hard gate (concentric-shell, principal-axis): pass/fail prediction?
+- Float32/float64 boundary location?
 
-### For new dose-math work (`raysim.dose.spline`, `raysim.dose.aggregator`)
+### Dose-math (`raysim.dose.spline`, `raysim.dose.aggregator`)
+- Edge cases: t=0, t<t_min, t>t_max, pure-zero species, mixed-zero, monotonicity bumps.
+- Per-species reconciliation: `sum(per-species) == total` for DDCs with non-trivial extras?
+- mm-Al-equivalent: still `RHO_AL_REF_G_CM3 = 2.70`? Physics justification if changed.
+- Field naming: never `sigma`/`±σ` — `angular_spread` and `shielding_pctile` only (ARCHI §12.3).
 
-Required analysis:
+### Environment importers (`raysim.env.importers.<dialect>`)
+- Output is canonical `DoseDepthCurve` — no dialect-specific schema escaping.
+- Unit conversion at boundary with explicit constants.
+- Per-species column mapping: canonical names, extras, unrecognized-column handling.
+- Mission metadata captured without parsing/normalizing.
+- Fixture under `tests/fixtures/` plus round-trip test.
 
-- Edge-case coverage: t = 0, t < t_min, t > t_max, pure-zero species, mixed-zero species, monotonicity bumps.
-- Per-species reconciliation: does `sum(per-species)` still equal `total` for DDCs with non-trivial extras?
-- mm-Al-equivalent reference density: still `RHO_AL_REF_G_CM3 = 2.70`? If changed, document the physics justification.
-- Field naming: never `sigma`, never `±σ` — `angular_spread` and `shielding_pctile` only (ARCHI §12.3).
-
-### For new environment importers (`raysim.env.importers.<dialect>`)
-
-Required analysis:
-
-- Output is the canonical `DoseDepthCurve` from `raysim.env.schema` — no dialect-specific schema escaping.
-- Unit conversion at the boundary (rad → krad, energy → mm_Al-eq, etc.) with explicit constants.
-- Per-species column mapping: which canonical names, which extras, how is "everything I don't recognize" handled?
-- Mission metadata captured into the result without parsing/normalizing.
-- Fixture file added under `tests/fixtures/` plus a round-trip test.
-
-### For new scene/geometry work (`raysim.geom`, Stage B)
-
-Required analysis (deferred to Phase B1):
-
+### Scene/geometry (`raysim.geom`, Stage B)
 - STEP feature support (AP203/AP214/AP242, assembly tree depth).
-- Healing strategy (`BRepMesh_ModelHealer` vs the hand-written fallback).
-- Outward-pointing normal convention (ARCHI §11) — including hollow solids' cavity sub-shells.
-- Per-shell watertightness — pass list, fail list, override path.
+- Healing strategy (`BRepMesh_ModelHealer` vs hand-written fallback).
+- Outward-pointing normal convention (ARCHI §11) including hollow solids.
+- Per-shell watertightness — pass/fail/override path.
 - Coincident-face classification: `contact_only`, `accepted_nested`, `interference_warning`, `interference_fail`.
 
-### For new CLI subcommands (`raysim.cli.*`)
+### CLI (`raysim.cli.*`)
+- Determinism: new output → `run.json` (canonical JSON) or sibling human file (free)?
+- Provenance: new inputs affecting the answer must hash into `Provenance`.
+- Exit codes: 0 success, 1 click error, 1 run-fatal.
+- I/O: stdout for one-line confirmation, stderr for structlog.
 
-Required analysis:
-
-- Determinism: does the new output go into `run.json` (canonical JSON required) or a sibling human file (free)?
-- Provenance: any new input that affects the answer must hash into `Provenance`.
-- Exit codes: 0 success, 1 click error, 1 run-fatal. No new conventions.
-- I/O streams: stdout for the one-line confirmation, stderr for structlog.
-
-### For new schemas / project file format (`raysim.proj`, `raysim.env.schema`)
-
-Required analysis:
-
-- `SCHEMA_VERSION` bump if the change is breaking.
-- Loader continues to accept `N-1` for one release (per `MVP_PLAN.md §10` policy).
+### Schemas (`raysim.proj`, `raysim.env.schema`)
+- `SCHEMA_VERSION` bump if breaking.
+- Loader accepts N-1 for one release.
 - Pydantic `extra="forbid"` on every input model.
-- Field naming consistent with existing conventions (`*_mm` for lengths, `*_g_cm3` for densities, `*_krad` for doses, `*_g_cm2` for mass-thickness).
+- Field naming: `*_mm`, `*_g_cm3`, `*_krad`, `*_g_cm2`.
