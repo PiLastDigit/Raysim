@@ -166,14 +166,108 @@ Depending on the feature (major, minor, patch), propose a new version using SemV
 
 ---
 
-## Step 3: Plan Review & Validation
+## Step 3: Codex Second-Opinion Review (Iterative)
 
-After creating the plan document, present a summary to the user including:
+Before showing the plan to the user for final review, run the
+**`codex-plan-review`** skill on the plan document and iterate until
+Codex returns `APPROVED` or the iteration cap is reached. Codex
+catches correctness, coherence, and completeness gaps that are easy to
+miss on a first draft — letting it surface those *before* the user
+sees the plan keeps the user-facing review focused on intent, scope,
+and priorities rather than mechanical issues.
+
+### 3.1 Confirm with the user
+
+**Use the `AskUserQuestion` tool** before kicking off the loop:
+
+- **Question**: "I'll run the Codex CLI as a second-opinion reviewer
+  on the plan and iterate until it's clean. Proceed?"
+- **Options**:
+  - **"Yes, run Codex review"** (Recommended) — start the loop.
+  - **"Skip Codex, go straight to user review"** — jump to Step 4.
+  - **"Cap iterations at N"** — let the user pick a tighter bound
+    than the default of 5.
+
+For trivial plans (single-file change, low-risk patch) the user may
+prefer to skip. For non-trivial plans (any new module, schema change,
+algorithm change) the loop is worth it.
+
+### 3.2 The iteration loop
+
+1. **Turn 1**: start a fresh Codex thread on the plan:
+   ```
+   bash .claude/skills/codex-plan-review/scripts/start.sh \
+       --prompt-file .claude/skills/codex-plan-review/prompts/start.tpl \
+       docs/1-plans/F_x.y.z_feature-name.plan.md
+   ```
+   The script writes the review to its per-plan state file and prints
+   it to stdout. Read the review.
+
+2. **Parse the trailing tag**:
+   - `APPROVED` → exit the loop, move to Step 4.
+   - `REQUEST_CHANGES` → continue to step 3.
+   - `NEEDS_REWORK` → stop the loop and surface to the user (the
+     plan has structural issues that warrant a conversation, not
+     mechanical fixes).
+
+3. **Address findings critically**. For each `P1` / `P2` finding:
+   - Quote the finding to the user in your response.
+   - Engage critically — not every Codex finding is correct. Push
+     back on ones you disagree with by noting your reasoning; apply
+     the legitimate ones by editing the plan file in place.
+   - Do not blindly apply suggestions; the user is the final arbiter
+     of design choices, but you are responsible for the mechanical
+     correctness within those choices.
+
+4. **Turn 2+**: invoke the resume helper:
+   ```
+   bash .claude/skills/codex-plan-review/scripts/resume.sh \
+       --prompt-file .claude/skills/codex-plan-review/prompts/resume.tpl \
+       docs/1-plans/F_x.y.z_feature-name.plan.md
+   ```
+   Codex re-reads the plan, confirms each prior finding's status,
+   and flags new issues. Loop back to step 2.
+
+5. **Iteration cap**: by default, stop after **5 rounds** even if
+   not yet `APPROVED`. Surface to the user with a summary of
+   remaining open findings and let them decide whether to push for
+   another round, accept the current state, or rework. Adjust this
+   cap if the user picked a different value in Step 3.1.
+
+### 3.3 Operating notes
+
+- **Surface Codex's review verbatim** to the user each round, not
+  just your interpretation. They want to see what the second
+  reviewer said.
+- **Keep your edits scoped to the addressed findings.** Don't bundle
+  unrelated cleanups during the loop — that makes the next
+  re-review noisy.
+- **If Codex repeatedly raises the same finding** despite your edits,
+  re-read the finding carefully — usually you addressed an adjacent
+  concern but not the one Codex flagged. State your understanding
+  back, then either fix the actual issue or push back if you think
+  Codex is misreading.
+- **Reset the thread** (`bash .claude/skills/codex-plan-review/scripts/reset.sh
+  <plan-path>`) only if the thread context has become genuinely
+  confused (e.g., you renamed sections substantially mid-loop and
+  Codex keeps citing stale line numbers). Resetting loses prior
+  context and starts the loop over.
+- **Don't run Codex review on plans where the user explicitly said
+  "skip"** — respect their judgment.
+
+---
+
+## Step 4: User Review & Validation
+
+After Codex review converges (or is skipped), present a summary to
+the user including:
 
 - **Feature**: [name]
 - **Approach**: [1-2 sentences]
 - **Files affected**: [count] files ([list key ones])
 - **Estimated complexity**: [simple/moderate/complex]
+- **Codex review status**: [APPROVED after N rounds | skipped |
+  capped at N rounds with M open findings]
 
 Then **use the `AskUserQuestion` tool** to collect feedback:
 
@@ -182,7 +276,7 @@ Then **use the `AskUserQuestion` tool** to collect feedback:
 
 Handle feedback:
 
-- **If "Request changes"**: Update the plan and re-present using `AskUserQuestion` again
+- **If "Request changes"**: Update the plan and re-present using `AskUserQuestion` again. If the changes are substantive, consider running another short Codex review pass on the edits.
 - **If "Needs rework"**: Discuss issues, rework the plan, and re-present
 - **If "Other" (custom input)**: Handle accordingly
 - **If "Approved"**: **Use the `AskUserQuestion` tool** to ask:
