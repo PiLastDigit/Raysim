@@ -43,6 +43,7 @@ Use this section as the working tracker. Keep the detailed step definitions belo
 - [x] B2.6 — Run gating and density anomaly warnings
 
 ### Phase B3
+- [ ] B3.0 — XCAF migration: unify STEP loader on STEPCAFControl_Reader
 - [ ] B3.1 — Main window shell
 - [ ] B3.2 — OCCT AIS viewer integration with picking
 - [ ] B3.3 — Material assignment UI
@@ -202,6 +203,8 @@ Goal: turn a single STEP file into the same in-memory scene Phase A consumes fro
 ### B1.1 — STEP loader with assembly tree
 `STEPCAFControl_Reader` from `pythonocc-core`: parse AP203/AP214/AP242, walk the assembly hierarchy, extract per-part names, layers, colors, and the `TopoDS_Shape` for each leaf solid. Build an internal `AssemblyNode` tree mirroring the STEP structure.
 
+**Implementation note (B1 as-shipped):** The initial implementation uses the plain `STEPControl_Reader` (not the XCAF reader) and assigns synthetic `solid_NNNN` IDs via depth-first walk order. Per-part names, colors, and layers from XCAF are not yet extracted. This deferral was pragmatic — the plain reader was sufficient for tessellation and the downstream engine — but creates a two-reader problem for B2.2's STEP material-tag ingestion, which requires the XCAF reader. The XCAF migration is planned for B3.0 (see below), where the UI needs names and colors for the assembly tree panel and material assignment UI.
+
 **Done when:** opening each benchmark STEP produces an `AssemblyNode` tree whose part count and naming match the source CAD's BoM; round-trip metadata (name, color, layer) preserved.
 
 ### B1.2 — Tessellation pipeline
@@ -275,6 +278,8 @@ Pydantic `Material` model: `group_id`, `density_g_cm3`, `z_eff`, `display_name`,
 ### B2.2 — STEP AP214_IS material-tag ingestion
 Wire `XCAFDoc_MaterialTool` to extract STEP-carried material names per part. Map STEP material strings to library entries via a fuzzy matcher with configurable thresholds. Tag each part with its STEP-derived material as a *suggestion* (overridable).
 
+**Implementation note (B2 as-shipped):** Because B1.1 uses the plain `STEPControl_Reader` while tag extraction requires the XCAF reader, `step_tags.extract_step_tags()` performs a second independent STEP read. Shape object identity does not survive across the two readers. Correlation uses DFS walk-order index with a **two-gate verification**: (a) leaf count must match, (b) per-leaf bounding boxes must agree within 1e-3 mm. If either gate fails, tag extraction returns an empty list and logs a warning — the naming-rule engine and manual assignment remain available as fallbacks. This workaround is eliminated by B3.0's XCAF migration, after which `LeafSolid` carries name/color/material_hint directly from the single XCAF load pass.
+
 **Done when:** a benchmark STEP that carries material tags (custom test article) auto-resolves ≥ 80% of parts on first import; mismatches are surfaced for review.
 
 ### B2.3 — Naming-rules auto-assignment
@@ -306,6 +311,18 @@ Block-run-until-complete state: a run is permitted only when every solid resolve
 ## Phase B3 — UI and authoring
 
 Goal: a clickable desktop app where the user opens a STEP, places detectors, picks a scenario, runs, and sees results.
+
+### B3.0 — XCAF migration: unify STEP loader on `STEPCAFControl_Reader`
+Migrate `raysim.geom.step_loader` from the plain `STEPControl_Reader` to `STEPCAFControl_Reader`. This is a prerequisite for B3.1–B3.3 (the UI needs part names, colors, and layers for the assembly tree panel) and eliminates the two-reader correlation workaround in `raysim.mat.step_tags`.
+
+**Changes:**
+- `step_loader.load_step()` uses `STEPCAFControl_Reader` as its primary reader. The XCAF label tree provides both the `TopoDS_Shape` per leaf and the per-label metadata (name, color, material hint).
+- `LeafSolid` gains optional fields: `name: str | None`, `color_rgb: tuple[float,float,float] | None`, `material_hint: str | None`.
+- `AssemblyNode` gains `name: str | None` from the XCAF label.
+- `step_tags.extract_step_tags()` is simplified: instead of a second STEP read + two-gate verification, it reads `name`/`color_rgb`/`material_hint` directly from the already-loaded `LeafSolid` records. The verification gate becomes dead code and is removed.
+- All existing B1 tests must still pass (same `LeafSolid` count, same bbox, same tessellation). New tests verify that name/color/material_hint are populated from XCAF-carrying STEP fixtures.
+
+**Done when:** `load_step()` on the benchmark STEPs produces the same leaf count and bboxes as before; `LeafSolid.name` is populated from XCAF labels where available; `step_tags.extract_step_tags()` no longer performs an independent STEP read; B1 + B2 test suites green.
 
 ### B3.1 — Main window shell
 PySide6 `QMainWindow` with a dockable panel layout: left = assembly tree + material panel + detector panel, center = 3D viewer, right = scenario panel + result panel + run panel. Menu bar (File / Edit / View / Run / Help). Settings persisted via `QSettings`.

@@ -24,5 +24,17 @@ def main(ctx: click.Context) -> None:
 main.add_command(run_cmd)
 
 
+@main.command()
+def gui() -> None:
+    """Launch the RaySim desktop application."""
+    try:
+        from raysim.ui.app import launch
+    except ImportError as exc:
+        raise click.ClickException(
+            "PySide6 not installed. Install with: uv sync --extra ui"
+        ) from exc
+    launch()
+
+
 if __name__ == "__main__":
     main()

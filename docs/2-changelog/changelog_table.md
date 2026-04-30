@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message |
 | ------- | ---- | -------------- |
+| `0.3.0` | 1    | Add Phase B3 UI + authoring: XCAF migration, PySide6 app, panels, overlays, run dispatch |
 | `0.2.0` | 1    | Add Phase B2 materials + project file: library, rules, STEP tags, review, gating, .raysim format |
 | `0.1.0` | 1    | Add Phase B1 geometry pipeline: STEP loader, tessellation, healing, overlap, adapter |
 | `0.0.2` | 1    | chore: initialize TRIP workflow |
@@ -9,6 +10,16 @@
 ---
 
 # Changelog Summary
+
+- **v0.3.0 (Phase B3 UI + Authoring — Week 1, 30-04-2026)**:
+  - **XCAF migration**: `step_loader` migrated to `STEPCAFControl_Reader`.
+    `LeafSolid` gains `name`/`color_rgb`/`material_hint`. `extract_step_tags()`
+    simplified to pure mapping from `LeafSolid` fields.
+  - **New package**: `raysim.ui` — PySide6 desktop app with OCCT viewer, 6
+    dockable panels (tree, material, detector, scenario, run, result), 3
+    overlays (ray-view, Mollweide, 6-face projection), QThread run dispatch.
+  - **New CLI**: `raysim gui` entry point.
+  - **Tests**: 3 new test files, XCAF field + DFS regression tests.
 
 - **v0.2.0 (Phase B2 Materials + Project File — Week 1, 30-04-2026)**:
   - **New package**: `raysim.mat` — seeded material library (14 entries),

@@ -1,19 +1,15 @@
-"""STEP material-tag ingestion — Phase B2.2.
+"""STEP material-tag ingestion — Phase B2.2 + B3.0 simplification.
 
-OCCT-dependent. Imports ``pythonocc-core`` at call time (not at module level).
-Tests guarded by ``pytest.importorskip("OCC.Core")``.
-
-Correlation with B1 leaf solids uses a two-gate verification (leaf count +
-bbox fingerprint) to avoid attaching tags to wrong solids when the XCAF and
-STEPControl readers produce different walk orders.
+After the B3.0 XCAF migration, ``LeafSolid`` carries ``name``,
+``color_rgb``, and ``material_hint`` directly from the XCAF reader.
+``extract_step_tags`` maps these fields to ``StepMaterialTag`` instances
+without any OCC imports or second file read.
 """
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import structlog
@@ -24,8 +20,6 @@ if TYPE_CHECKING:
     from raysim.geom.step_loader import LeafSolid
 
 _LOG = structlog.get_logger(__name__)
-
-_BBOX_TOL_MM = 1e-3
 
 
 @dataclass(frozen=True)
@@ -48,143 +42,24 @@ class TagMatch:
 
 
 def extract_step_tags(
-    step_path: Path,
     leaves: Sequence[LeafSolid],
 ) -> list[StepMaterialTag]:
-    """Extract material names and colors from a STEP file via XCAF.
+    """Build material tags from ``LeafSolid`` XCAF attributes.
 
-    Correlates XCAF leaves with B1's ``LeafSolid`` list by DFS walk-order
-    index, verified by a leaf-count + bbox-fingerprint gate.
+    After the B3.0 XCAF migration, the ``LeafSolid`` dataclass carries
+    ``material_hint`` and ``color_rgb`` populated by the XCAF reader at
+    load time. This function is a pure mapping — no OCC imports needed.
     """
-    from OCC.Core.IFSelect import IFSelect_RetDone
-    from OCC.Core.STEPCAFControl import STEPCAFControl_Reader
-    from OCC.Core.TCollection import TCollection_ExtendedString
-    from OCC.Core.TDF import TDF_LabelSequence
-    from OCC.Core.TDocStd import TDocStd_Document
-    from OCC.Core.TopAbs import TopAbs_SOLID
-    from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
-
-    handle = TDocStd_Document(TCollection_ExtendedString("XDE"))
-    reader = STEPCAFControl_Reader()
-    reader.SetColorMode(True)
-    reader.SetNameMode(True)
-    reader.SetMatMode(True)
-
-    status = reader.ReadFile(str(step_path))
-    if status != IFSelect_RetDone:
-        _LOG.warning("step_tags.read_failed", path=str(step_path), status=status)
-        return []
-
-    reader.Transfer(handle)
-
-    shape_tool = XCAFDoc_DocumentTool.ShapeTool(handle.Main())
-    color_tool = XCAFDoc_DocumentTool.ColorTool(handle.Main())
-    mat_tool = XCAFDoc_DocumentTool.MaterialTool(handle.Main())
-
-    # Collect XCAF leaf solids in DFS order.
-    xcaf_leaves: list[tuple[str | None, tuple[float, float, float] | None, tuple[float, ...]]] = []
-
-    free_shapes = TDF_LabelSequence()
-    shape_tool.GetFreeShapes(free_shapes)
-
-    def _walk_labels(label_seq: TDF_LabelSequence) -> None:
-        for i in range(label_seq.Length()):
-            label = label_seq.Value(i + 1)
-            if shape_tool.IsSimpleShape(label):
-                shape = shape_tool.GetShape(label)
-                if shape is not None and shape.ShapeType() == TopAbs_SOLID:
-                    mat_name = _get_material_name(mat_tool, label)
-                    color = _get_color(color_tool, label)
-                    bbox = _get_bbox(shape)
-                    xcaf_leaves.append((mat_name, color, bbox))
-            if shape_tool.IsAssembly(label):
-                children = TDF_LabelSequence()
-                shape_tool.GetComponents(label, children)
-                _walk_labels(children)
-
-    _walk_labels(free_shapes)
-
-    # Verification gate 1: count.
-    if len(xcaf_leaves) != len(leaves):
-        _LOG.warning(
-            "step_tags.count_mismatch",
-            xcaf_count=len(xcaf_leaves),
-            b1_count=len(leaves),
-            path=str(step_path),
-        )
-        return []
-
-    # Verification gate 2: bbox fingerprint.
-    for i, (_, _, xcaf_bbox) in enumerate(xcaf_leaves):
-        b1 = leaves[i]
-        b1_flat = (*b1.bbox_min_mm, *b1.bbox_max_mm)
-        if not _bbox_close(xcaf_bbox, b1_flat):
-            _LOG.warning(
-                "step_tags.bbox_mismatch",
-                index=i,
-                xcaf_bbox=xcaf_bbox,
-                b1_bbox=b1_flat,
-            )
-            return []
-
-    # Zip tags to B1 solid_ids.
     tags: list[StepMaterialTag] = []
-    for i, (mat_name, color, _) in enumerate(xcaf_leaves):
+    for leaf in leaves:
         tags.append(StepMaterialTag(
-            solid_id=leaves[i].solid_id,
-            material_name=mat_name,
-            color_rgb=color,
+            solid_id=leaf.solid_id,
+            material_name=leaf.material_hint,
+            color_rgb=leaf.color_rgb,
         ))
 
-    _LOG.info("step_tags.extracted", n_tags=len(tags), path=str(step_path))
+    _LOG.info("step_tags.extracted", n_tags=len(tags))
     return tags
-
-
-def _bbox_close(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
-    if len(a) != len(b):
-        return False
-    return all(math.isclose(x, y, abs_tol=_BBOX_TOL_MM) for x, y in zip(a, b, strict=True))
-
-
-def _get_bbox(shape: object) -> tuple[float, ...]:
-    from OCC.Core.Bnd import Bnd_Box
-    from OCC.Core.BRepBndLib import brepbndlib
-
-    bbox = Bnd_Box()
-    brepbndlib.Add(shape, bbox)
-    xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
-    return (xmin, ymin, zmin, xmax, ymax, zmax)
-
-
-def _get_material_name(mat_tool: object, label: object) -> str | None:
-    from OCC.Core.TCollection import TCollection_HAsciiString
-
-    name = TCollection_HAsciiString("")
-    desc = TCollection_HAsciiString("")
-    density = [0.0]
-    dense_name = TCollection_HAsciiString("")
-    dense_val_type = TCollection_HAsciiString("")
-    try:
-        if mat_tool.GetMaterial(label, name, desc, density, dense_name, dense_val_type):  # type: ignore[attr-defined]
-            text = name.String() if name else None
-            if text:
-                return str(text)
-    except Exception:
-        pass
-    return None
-
-
-def _get_color(color_tool: object, label: object) -> tuple[float, float, float] | None:
-    from OCC.Core.Quantity import Quantity_Color
-    from OCC.Core.XCAFDoc import XCAFDoc_ColorGen
-
-    c = Quantity_Color()
-    try:
-        if color_tool.GetColor(label, XCAFDoc_ColorGen, c):  # type: ignore[attr-defined]
-            return (c.Red(), c.Green(), c.Blue())
-    except Exception:
-        pass
-    return None
 
 
 def match_tags_to_library(

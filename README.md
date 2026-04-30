@@ -6,7 +6,7 @@ See [`MVP_PLAN.md`](MVP_PLAN.md) for scope and decisions, [`MVP_STEPS.md`](MVP_S
 
 ## Project status
 
-**v0.2.0** — Phase A complete (headless `raysim run` CLI). Phase B1 geometry pipeline landed (STEP loader, tessellation, healing, watertightness, overlap diagnostic, Stage A adapter). Phase B2 material governance landed: seeded 14-entry material library, naming-rule auto-assignment engine, STEP tag ingestion (OCCT-optional), auto-assignment review API, run gating with density anomaly warnings, `.raysim` project file format.
+**v0.3.0** — Phase A complete (headless `raysim run` CLI). Phase B1 geometry pipeline landed. Phase B2 material governance landed. Phase B3 UI + authoring landed: XCAF migration (single-reader STEP pipeline with part names/colors/material hints), PySide6 desktop application (`raysim gui`) with OCCT 3D viewer, assembly tree, material assignment panel, detector placement with snap modes, scenario panel with DDC preview, QThread run dispatch with progress/cancel, result table with 3D ray-view + Mollweide + 6-face projection overlays.
 
 ## Quickstart (development)
 

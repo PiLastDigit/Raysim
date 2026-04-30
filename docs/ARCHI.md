@@ -2,7 +2,7 @@
 
 ## 1. How to Read This Document
 
-This document is the source of architectural truth for RaySim. It describes the codebase as it exists today (Phase 0 + Phase A + Phase B1 + Phase B2 complete; Phase B3 not yet started) and the patterns the rest of the build will follow. Read it before landing any code change that touches more than one module.
+This document is the source of architectural truth for RaySim. It describes the codebase as it exists today (Phase 0 + Phase A + Phase B1 + Phase B2 + Phase B3 complete; Phase B4 not yet started) and the patterns the rest of the build will follow. Read it before landing any code change that touches more than one module.
 
 Audience:
 
@@ -114,7 +114,14 @@ raysim/
 │   │   ├── step_tags.py          # XCAF material-tag extraction, OCCT-optional (B2.2)
 │   │   ├── review.py             # auto-assignment review API (B2.4)
 │   │   └── gating.py             # run-readiness + density anomaly checks (B2.6)
-│   ├── ui/                        # placeholder — Stage B (PySide6 shell)
+│   ├── ui/                        # B3: PySide6 desktop application
+│   │   ├── app.py                # QMainWindow, launch(), QSettings
+│   │   ├── viewer.py             # OCCT AIS viewer, snap picking, selection
+│   │   ├── state.py              # AppState controller, project lifecycle
+│   │   ├── panels/               # dockable panels (tree, material, detector,
+│   │   │                         #   scenario, run, result)
+│   │   ├── workers/              # QThread engine dispatch (run_worker)
+│   │   └── overlays/             # ray-view, Mollweide, 6-face projection
 │   └── report/                    # placeholder — Stage B (PDF/CSV)
 │
 ├── tests/
@@ -234,7 +241,7 @@ raysim run [OPTIONS]      # the Stage A driver
   --human-metadata-out    # optional sibling for timestamped non-deterministic data
 ```
 
-Stage B will add additional subcommands (`raysim gui`, `raysim project ...`, etc.) under the same group.
+`raysim gui` (B3) launches the PySide6 desktop application. Requires the `[ui]` extra. Fails gracefully with a clear error if PySide6 is missing.
 
 I/O conventions:
 
@@ -271,7 +278,7 @@ Phase B1 adds the STEP ingest path. The pipeline produces the same `BuiltScene` 
 
 Key modules:
 
-- **`step_loader`** (B1.1): Reads STEP via `STEPControl_Reader`, walks the compound recursively into `LeafSolid` records with synthetic IDs (`solid_NNNN`) and path keys reflecting the tree structure.
+- **`step_loader`** (B1.1 + B3.0): Reads STEP via `STEPCAFControl_Reader` (migrated from `STEPControl_Reader` in B3.0), walks the XCAF label tree recursively into `LeafSolid` records with synthetic IDs (`solid_NNNN`), path keys, and XCAF attributes (`name`, `color_rgb`, `material_hint`). `AssemblyNode` also carries an optional `name` from XCAF.
 - **`tessellation`** (B1.2): `BRepMesh_IncrementalMesh` per leaf solid. Extracts per-shell triangle arrays in float64 with `loc.Transformation()` applied.
 - **`healing`** (B1.3): `BRepMesh_ModelHealer` pass + shell-orientation normalization. Classifies shells as OUTER or CAVITY via vertex-centroid containment. Per-shell probe rays verify orientation; flips are re-verified with full entry/exit stack-to-zero sequence check.
 - **`watertightness`** (B1.4): Per-shell edge-pairing with vertex canonicalization (1e-9 mm tolerance). Reports unpaired edges, same-orientation edges, degenerate triangles.
@@ -288,11 +295,11 @@ Key modules:
 
 - **`library`** (B2.1): `MaterialLibrary` frozen dataclass wrapping `tuple[Material, ...]` with a `by_group_id` lookup. Ships a seeded 14-entry YAML (`default_library.yaml`): 11 base materials (Al 6061, Cu, Si, SiO₂, Kapton, FR4, Ti-6Al-4V, W, GaAs, Au, Sn-Pb solder) + 3 composites (battery, populated PCB, harness). User-extendable via `merge()`.
 - **`rules`** (B2.3): `SolidRef(solid_id, path_key, display_name)` is the stable input token. `NamingRule` maps a regex pattern to a `group_id` at a priority level. `apply_rules()` evaluates rules against all three `SolidRef` fields; highest-priority unique match wins, ties at the same priority and different `group_id` mark the solid ambiguous. Ships `default_rules.yaml` with 16 patterns.
-- **`step_tags`** (B2.2): OCCT-optional. `extract_step_tags(step_path, leaves)` reads XCAF material names and colors via `STEPCAFControl_Reader` + `XCAFDoc_MaterialTool`. Correlation with B1's `LeafSolid` list uses a two-gate verification (leaf count + per-leaf bbox fingerprint within 1e-3 mm) before zipping by DFS walk-order index. Falls back to empty tags on mismatch. `match_tags_to_library()` fuzzy-matches STEP strings to library entries.
+- **`step_tags`** (B2.2 + B3.0): Pure Python after the B3.0 XCAF migration. `extract_step_tags(leaves)` maps `LeafSolid.material_hint` and `LeafSolid.color_rgb` (populated by the XCAF reader at load time) to `StepMaterialTag` instances — no OCC imports needed. `match_tags_to_library()` fuzzy-matches STEP strings to library entries.
 - **`review`** (B2.4): `build_review()` combines manual assignments, STEP tags, and naming rules with priority `manual > step_tag > naming_rule`. Invalid manual assignments (unknown `group_id`) remain unresolved — they are never overridden by auto-sources. `review_to_assignments()` converts to `MaterialAssignment[]`; raises `ValueError` on unresolved solids.
 - **`gating`** (B2.6): `check_run_readiness()` verifies every solid has an assignment resolving to a library entry. `check_density_anomalies()` flags `density_g_cm3 < 0.5` or `> 25.0` (warnings, not blockers).
 
-All modules except `step_tags` are pure Python and fully testable in the `uv`-based CI. `step_tags` guards OCC imports at call time.
+All `raysim.mat` modules are pure Python and fully testable in the `uv`-based CI (including `step_tags`, which after B3.0 reads from `LeafSolid` fields without OCC imports).
 
 ### 9d. Project File (`raysim.proj.project`) — B2
 
@@ -597,4 +604,4 @@ Architectural decisions worth re-stating because they show up everywhere:
 - **Provenance hashes every input that changes the answer** — the reproducibility contract.
 - **Material physics scope: density only** — every other field is metadata preserved for forward compatibility.
 
-The path from here is: B1 (geometry pipeline) → B2 (materials + project file) → B3 (UI) → B4 (reports + packaging) → B5 (validation + hardening). Each step builds on Phase A's engine without modifying it.
+The path from here is: B4 (reports + packaging) → B5 (validation + hardening). B1 (geometry pipeline), B2 (materials + project file), and B3 (UI + authoring) are complete. Each step builds on Phase A's engine without modifying it.

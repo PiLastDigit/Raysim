@@ -1,10 +1,9 @@
-"""STEP file loader — Phase B1.1.
+"""STEP file loader — Phase B1.1 + B3.0 XCAF migration.
 
-Wraps ``OCC.Core.STEPControl.STEPControl_Reader`` to load a STEP file and
-walk its compound into leaf ``TopoDS_Solid`` records with stable synthetic
-IDs (``solid_NNNN``).  Per-part names/colors/layers from XCAF are deferred
-to B2.2 (blocked by the ``XCAFDoc_DocumentTool`` bootstrap regression
-documented in ``docs/decisions/phase-0.md``).
+Uses ``OCC.Core.STEPCAFControl.STEPCAFControl_Reader`` to load a STEP file
+via the XCAF document framework, extracting part names, colors, and material
+hints alongside geometry.  Walks the XCAF label tree into leaf
+``TopoDS_Solid`` records with stable synthetic IDs (``solid_NNNN``).
 """
 
 from __future__ import annotations
@@ -27,6 +26,9 @@ class LeafSolid:
     shape: object  # TopoDS_Solid
     bbox_min_mm: tuple[float, float, float]
     bbox_max_mm: tuple[float, float, float]
+    name: str | None = None
+    color_rgb: tuple[float, float, float] | None = None
+    material_hint: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,7 @@ class AssemblyNode:
     path_key: str
     children: tuple[AssemblyNode, ...]
     leaf: LeafSolid | None
+    name: str | None = None
 
 
 def load_step(path: str | Path) -> AssemblyNode:
@@ -44,23 +47,32 @@ def load_step(path: str | Path) -> AssemblyNode:
     Raises ``ValueError`` on empty STEP (no solids) or read failure.
     """
     from OCC.Core.IFSelect import IFSelect_RetDone
-    from OCC.Core.STEPControl import STEPControl_Reader
+    from OCC.Core.STEPCAFControl import STEPCAFControl_Reader
+    from OCC.Core.TCollection import TCollection_ExtendedString
+    from OCC.Core.TDocStd import TDocStd_Document
+    from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
 
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"STEP file not found: {path}")
 
-    reader = STEPControl_Reader()
+    handle = TDocStd_Document(TCollection_ExtendedString("XDE"))
+    reader = STEPCAFControl_Reader()
+    reader.SetColorMode(True)
+    reader.SetNameMode(True)
+    reader.SetMatMode(True)
+
     status = reader.ReadFile(str(path))
     if status != IFSelect_RetDone:
         raise ValueError(f"STEP read failed (status {status}): {path}")
 
-    reader.TransferRoots()
-    root_shape = reader.OneShape()
-    if root_shape is None:
-        raise ValueError(f"STEP file contains no shapes: {path}")
+    reader.Transfer(handle)
 
-    root_node = _build_tree(root_shape)
+    shape_tool = XCAFDoc_DocumentTool.ShapeTool(handle.Main())
+    color_tool = XCAFDoc_DocumentTool.ColorTool(handle.Main())
+    mat_tool = XCAFDoc_DocumentTool.MaterialTool(handle.Main())
+
+    root_node = _build_tree_xcaf(shape_tool, color_tool, mat_tool)
     leaves = list(iter_leaves(root_node))
     if not leaves:
         raise ValueError(f"STEP file contains no solids: {path}")
@@ -77,135 +89,240 @@ def iter_leaves(node: AssemblyNode) -> Iterator[LeafSolid]:
         yield from iter_leaves(child)
 
 
-def _build_tree(
-    shape: object, *, _prefix: str = "", _counter: list[int] | None = None,
+def _build_tree_xcaf(
+    shape_tool: object,
+    color_tool: object,
+    mat_tool: object,
 ) -> AssemblyNode:
-    """Build a recursive ``AssemblyNode`` tree from a ``TopoDS_Shape``."""
-    from OCC.Core.Bnd import Bnd_Box
-    from OCC.Core.BRepBndLib import brepbndlib
-    from OCC.Core.TopAbs import TopAbs_COMPOUND, TopAbs_COMPSOLID, TopAbs_SOLID
-    from OCC.Core.TopoDS import TopoDS_Iterator, topods
+    """Build a recursive ``AssemblyNode`` tree from the XCAF label hierarchy."""
+    from OCC.Core.TDF import TDF_LabelSequence
 
-    if _counter is None:
-        _counter = [0]
+    free_shapes = TDF_LabelSequence()
+    shape_tool.GetFreeShapes(free_shapes)  # type: ignore[attr-defined]
 
-    shape_type = shape.ShapeType()  # type: ignore[attr-defined]
-
-    if shape_type == TopAbs_SOLID:
-        solid = topods.Solid(shape)
-        solid_id = f"solid_{_counter[0]:04d}"
-        _counter[0] += 1
-
-        bbox = Bnd_Box()
-        brepbndlib.Add(solid, bbox)
-        xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
-
-        leaf = LeafSolid(
-            solid_id=solid_id,
-            path_key=_prefix or "0",
-            shape=solid,
-            bbox_min_mm=(xmin, ymin, zmin),
-            bbox_max_mm=(xmax, ymax, zmax),
-        )
-        return AssemblyNode(path_key=_prefix or "0", children=(), leaf=leaf)
-
-    if shape_type in (TopAbs_COMPOUND, TopAbs_COMPSOLID):
-        children: list[AssemblyNode] = []
-        it = TopoDS_Iterator(shape)
-        child_idx = 0
-        while it.More():
-            child = it.Value()
-            child_prefix = f"{_prefix}/{child_idx}" if _prefix else str(child_idx)
-            children.append(_build_tree(
-                child, _prefix=child_prefix, _counter=_counter,
-            ))
-            child_idx += 1
-            it.Next()
-        return AssemblyNode(path_key=_prefix, children=tuple(children), leaf=None)
-
-    # Fallback: use _extract_leaves for other shape types.
-    leaves = _extract_leaves(shape, _prefix=_prefix, _counter=_counter)
-    leaf_children = tuple(
-        AssemblyNode(path_key=leaf.path_key, children=(), leaf=leaf)
-        for leaf in leaves
-    )
-    return AssemblyNode(path_key=_prefix, children=leaf_children, leaf=None)
-
-
-def _extract_leaves(
-    shape: object, *, _prefix: str = "", _counter: list[int] | None = None,
-) -> list[LeafSolid]:
-    """Walk a TopoDS_Shape recursively, extracting TopoDS_Solid leaves.
-
-    Path keys reflect the recursive walk path (e.g. ``"0/2/1"``).
-    ``solid_id`` is assigned sequentially across the whole tree.
-    """
-    from OCC.Core.Bnd import Bnd_Box
-    from OCC.Core.BRepBndLib import brepbndlib
-    from OCC.Core.TopAbs import TopAbs_COMPOUND, TopAbs_COMPSOLID, TopAbs_SOLID
-    from OCC.Core.TopoDS import TopoDS_Iterator, topods
-
-    if _counter is None:
-        _counter = [0]
-
-    solids: list[LeafSolid] = []
-    shape_type = shape.ShapeType()  # type: ignore[attr-defined]
-
-    if shape_type == TopAbs_SOLID:
-        solid = topods.Solid(shape)
-        solid_id = f"solid_{_counter[0]:04d}"
-        _counter[0] += 1
-
-        bbox = Bnd_Box()
-        brepbndlib.Add(solid, bbox)
-        xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
-
-        solids.append(
-            LeafSolid(
-                solid_id=solid_id,
-                path_key=_prefix or "0",
-                shape=solid,
-                bbox_min_mm=(xmin, ymin, zmin),
-                bbox_max_mm=(xmax, ymax, zmax),
+    counter = [0]
+    children: list[AssemblyNode] = []
+    for i in range(free_shapes.Length()):
+        label = free_shapes.Value(i + 1)
+        child_prefix = str(i)
+        children.append(
+            _walk_label(
+                label, shape_tool, color_tool, mat_tool,
+                _prefix=child_prefix, _counter=counter,
             )
         )
-    elif shape_type in (TopAbs_COMPOUND, TopAbs_COMPSOLID):
-        it = TopoDS_Iterator(shape)
-        child_idx = 0
-        while it.More():
-            child = it.Value()
-            child_prefix = f"{_prefix}/{child_idx}" if _prefix else str(child_idx)
-            solids.extend(_extract_leaves(
-                child, _prefix=child_prefix, _counter=_counter,
-            ))
-            child_idx += 1
-            it.Next()
-    else:
-        # Try TopExp_Explorer for other shape types that may contain solids.
-        from OCC.Core.TopExp import TopExp_Explorer
 
-        explorer = TopExp_Explorer(shape, TopAbs_SOLID)
-        child_idx = 0
-        while explorer.More():
-            solid = topods.Solid(explorer.Current())
-            child_prefix = f"{_prefix}/{child_idx}" if _prefix else str(child_idx)
-            solid_id = f"solid_{_counter[0]:04d}"
-            _counter[0] += 1
+    if len(children) == 1:
+        return children[0]
+    return AssemblyNode(path_key="", children=tuple(children), leaf=None)
 
-            bbox = Bnd_Box()
-            brepbndlib.Add(solid, bbox)
-            xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
 
-            solids.append(
-                LeafSolid(
-                    solid_id=solid_id,
-                    path_key=child_prefix,
-                    shape=solid,
-                    bbox_min_mm=(xmin, ymin, zmin),
-                    bbox_max_mm=(xmax, ymax, zmax),
+def _walk_label(
+    label: object,
+    shape_tool: object,
+    color_tool: object,
+    mat_tool: object,
+    *,
+    _prefix: str,
+    _counter: list[int],
+) -> AssemblyNode:
+    """Recursively walk one XCAF label into an AssemblyNode."""
+    from OCC.Core.TDF import TDF_LabelSequence
+    from OCC.Core.TopAbs import TopAbs_COMPOUND, TopAbs_COMPSOLID, TopAbs_SOLID
+
+    label_name = _get_label_name(label)
+
+    if shape_tool.IsAssembly(label):  # type: ignore[attr-defined]
+        children: list[AssemblyNode] = []
+        components = TDF_LabelSequence()
+        shape_tool.GetComponents(label, components)  # type: ignore[attr-defined]
+        for i in range(components.Length()):
+            comp_label = components.Value(i + 1)
+            ref_label = comp_label
+            if shape_tool.IsReference(comp_label):  # type: ignore[attr-defined]
+                from OCC.Core.TDF import TDF_Label
+                ref = TDF_Label()
+                shape_tool.GetReferredShape(comp_label, ref)  # type: ignore[attr-defined]
+                ref_label = ref
+            child_prefix = f"{_prefix}/{i}" if _prefix else str(i)
+            children.append(
+                _walk_label(
+                    ref_label, shape_tool, color_tool, mat_tool,
+                    _prefix=child_prefix, _counter=_counter,
                 )
             )
-            child_idx += 1
-            explorer.Next()
+        return AssemblyNode(
+            path_key=_prefix, children=tuple(children), leaf=None,
+            name=label_name,
+        )
 
-    return solids
+    if shape_tool.IsSimpleShape(label):  # type: ignore[attr-defined]
+        shape = shape_tool.GetShape(label)  # type: ignore[attr-defined]
+        if shape is not None:
+            shape_type = shape.ShapeType()
+            if shape_type == TopAbs_SOLID:
+                return _make_leaf_node(
+                    shape, label, shape_tool, color_tool, mat_tool,
+                    _prefix=_prefix, _counter=_counter, label_name=label_name,
+                )
+            if shape_type in (TopAbs_COMPOUND, TopAbs_COMPSOLID):
+                return _walk_compound(
+                    shape, label, shape_tool, color_tool, mat_tool,
+                    _prefix=_prefix, _counter=_counter, label_name=label_name,
+                )
+
+    return AssemblyNode(path_key=_prefix, children=(), leaf=None, name=label_name)
+
+
+def _walk_compound(
+    shape: object,
+    label: object,
+    shape_tool: object,
+    color_tool: object,
+    mat_tool: object,
+    *,
+    _prefix: str,
+    _counter: list[int],
+    label_name: str | None,
+) -> AssemblyNode:
+    """Walk a compound/compsolid shape, extracting child solids."""
+    from OCC.Core.TopAbs import TopAbs_SOLID
+    from OCC.Core.TopoDS import TopoDS_Iterator, topods
+
+    children: list[AssemblyNode] = []
+    it = TopoDS_Iterator(shape)
+    child_idx = 0
+    while it.More():
+        child = it.Value()
+        child_prefix = f"{_prefix}/{child_idx}" if _prefix else str(child_idx)
+        if child.ShapeType() == TopAbs_SOLID:
+            solid = topods.Solid(child)
+            leaf = _make_leaf(
+                solid, color_tool, mat_tool, label,
+                _prefix=child_prefix, _counter=_counter, label_name=None,
+            )
+            children.append(
+                AssemblyNode(path_key=child_prefix, children=(), leaf=leaf)
+            )
+        else:
+            children.append(
+                _walk_compound(
+                    child, label, shape_tool, color_tool, mat_tool,
+                    _prefix=child_prefix, _counter=_counter, label_name=None,
+                )
+            )
+        child_idx += 1
+        it.Next()
+
+    return AssemblyNode(
+        path_key=_prefix, children=tuple(children), leaf=None,
+        name=label_name,
+    )
+
+
+def _make_leaf_node(
+    shape: object,
+    label: object,
+    shape_tool: object,
+    color_tool: object,
+    mat_tool: object,
+    *,
+    _prefix: str,
+    _counter: list[int],
+    label_name: str | None,
+) -> AssemblyNode:
+    """Create a leaf AssemblyNode for a single solid."""
+    from OCC.Core.TopoDS import topods
+
+    solid = topods.Solid(shape)
+    leaf = _make_leaf(
+        solid, color_tool, mat_tool, label,
+        _prefix=_prefix, _counter=_counter, label_name=label_name,
+    )
+    return AssemblyNode(path_key=_prefix, children=(), leaf=leaf, name=label_name)
+
+
+def _make_leaf(
+    solid: object,
+    color_tool: object,
+    mat_tool: object,
+    label: object,
+    *,
+    _prefix: str,
+    _counter: list[int],
+    label_name: str | None,
+) -> LeafSolid:
+    """Create a LeafSolid with bbox, color, and material hint."""
+    from OCC.Core.Bnd import Bnd_Box
+    from OCC.Core.BRepBndLib import brepbndlib
+
+    solid_id = f"solid_{_counter[0]:04d}"
+    _counter[0] += 1
+
+    bbox = Bnd_Box()
+    brepbndlib.Add(solid, bbox)
+    xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
+
+    color = _get_color(color_tool, label)
+    mat_hint = _get_material_name(mat_tool, label)
+
+    return LeafSolid(
+        solid_id=solid_id,
+        path_key=_prefix or "0",
+        shape=solid,
+        bbox_min_mm=(xmin, ymin, zmin),
+        bbox_max_mm=(xmax, ymax, zmax),
+        name=label_name,
+        color_rgb=color,
+        material_hint=mat_hint,
+    )
+
+
+def _get_label_name(label: object) -> str | None:
+    """Extract the name attribute from an XCAF label."""
+    from OCC.Core.TDataStd import TDataStd_Name
+
+    name_attr = TDataStd_Name()
+    try:
+        if label.FindAttribute(TDataStd_Name.GetID(), name_attr):  # type: ignore[attr-defined]
+            text = name_attr.Get()
+            if text:
+                s = str(text.ToExtString()) if hasattr(text, "ToExtString") else str(text)
+                if s.strip():
+                    return s.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _get_material_name(mat_tool: object, label: object) -> str | None:
+    """Extract the material name from an XCAF label via MaterialTool."""
+    from OCC.Core.TCollection import TCollection_HAsciiString
+
+    name = TCollection_HAsciiString("")
+    desc = TCollection_HAsciiString("")
+    density = [0.0]
+    dense_name = TCollection_HAsciiString("")
+    dense_val_type = TCollection_HAsciiString("")
+    try:
+        if mat_tool.GetMaterial(label, name, desc, density, dense_name, dense_val_type):  # type: ignore[attr-defined]
+            text = name.String() if name else None
+            if text:
+                return str(text)
+    except Exception:
+        pass
+    return None
+
+
+def _get_color(color_tool: object, label: object) -> tuple[float, float, float] | None:
+    """Extract the color from an XCAF label via ColorTool."""
+    from OCC.Core.Quantity import Quantity_Color
+    from OCC.Core.XCAFDoc import XCAFDoc_ColorGen
+
+    c = Quantity_Color()
+    try:
+        if color_tool.GetColor(label, XCAFDoc_ColorGen, c):  # type: ignore[attr-defined]
+            return (c.Red(), c.Green(), c.Blue())
+    except Exception:
+        pass
+    return None
