@@ -1,0 +1,68 @@
+# RaySim default naming rules — Phase B2.3
+# Patterns are matched case-insensitively against solid_id, path_key, and
+# display_name. Higher priority wins on tie.
+
+rules:
+  - pattern: "(?i)(^|[_/\\-])al(u?m?i?n?[ui]?[um]?m?|_?6061)([_/\\-]|$)"
+    group_id: aluminum_6061
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])cu(pper)?([_/\\-]|$)"
+    group_id: copper
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])si(licon)?([_/\\-]|$)"
+    group_id: silicon
+    priority: 5
+
+  - pattern: "(?i)(^|[_/\\-])sio2([_/\\-]|$)"
+    group_id: silicon_dioxide
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])kapton([_/\\-]|$)"
+    group_id: kapton
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])fr4([_/\\-]|$)"
+    group_id: fr4
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])pcb([_/\\-]|$)"
+    group_id: populated_pcb
+    priority: 8
+
+  - pattern: "(?i)(^|[_/\\-])ti(tanium)?([_/\\-]|$)"
+    group_id: titanium_6al4v
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])tungsten([_/\\-]|$)"
+    group_id: tungsten
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])w([_/\\-]|$)"
+    group_id: tungsten
+    priority: 5
+
+  - pattern: "(?i)(^|[_/\\-])au([_/\\-]|$)"
+    group_id: gold
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])gold([_/\\-]|$)"
+    group_id: gold
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])ga(llium)?_?as(enide)?([_/\\-]|$)"
+    group_id: gallium_arsenide
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])batt(ery)?([_/\\-]|$)"
+    group_id: battery
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])solder([_/\\-]|$)"
+    group_id: sn_pb_solder
+    priority: 10
+
+  - pattern: "(?i)(^|[_/\\-])harness([_/\\-]|$)"
+    group_id: harness
+    priority: 10

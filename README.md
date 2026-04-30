@@ -6,7 +6,7 @@ See [`MVP_PLAN.md`](MVP_PLAN.md) for scope and decisions, [`MVP_STEPS.md`](MVP_S
 
 ## Project status
 
-**v0.1.0** — Phase A complete (headless `raysim run` CLI). Phase B1 geometry pipeline landed: STEP loader, tessellation, healing, watertightness validation, overlap diagnostic, and Stage A adapter. STEP→engine round-trip functional; STEP fixtures require `pythonocc-core` (conda-only).
+**v0.2.0** — Phase A complete (headless `raysim run` CLI). Phase B1 geometry pipeline landed (STEP loader, tessellation, healing, watertightness, overlap diagnostic, Stage A adapter). Phase B2 material governance landed: seeded 14-entry material library, naming-rule auto-assignment engine, STEP tag ingestion (OCCT-optional), auto-assignment review API, run gating with density anomaly warnings, `.raysim` project file format.
 
 ## Quickstart (development)
 

@@ -2,7 +2,7 @@
 
 ## 1. How to Read This Document
 
-This document is the source of architectural truth for RaySim. It describes the codebase as it exists today (Phase 0 + Phase A complete; Phase B not yet started) and the patterns the rest of the build will follow. Read it before landing any code change that touches more than one module.
+This document is the source of architectural truth for RaySim. It describes the codebase as it exists today (Phase 0 + Phase A + Phase B1 + Phase B2 complete; Phase B3 not yet started) and the patterns the rest of the build will follow. Read it before landing any code change that touches more than one module.
 
 Audience:
 
@@ -96,7 +96,8 @@ raysim/
 │   ├── proj/
 │   │   ├── schema.py              # Material / Detector / Provenance / RunResult
 │   │   ├── canonical_json.py      # deterministic JSON serializer
-│   │   └── hashing.py             # SHA-256 of canonical payloads
+│   │   ├── hashing.py             # SHA-256 of canonical payloads
+│   │   └── project.py             # .raysim project file schema + I/O (B2.5)
 │   ├── geom/                      # B1: STEP ingest, tessellation, healing, overlap
 │   │   ├── step_loader.py        # STEP read + leaf walk (B1.1)
 │   │   ├── tessellation.py       # BRepMesh wrapper (B1.2)
@@ -105,7 +106,14 @@ raysim/
 │   │   ├── overlap.py            # 4-way overlap diagnostic (B1.5)
 │   │   ├── pipeline.py           # orchestrator (B1.6)
 │   │   └── adapter.py            # STL export + Stage A handoff (B1.6)
-│   ├── mat/                       # placeholder — Stage B (library + assignment UI)
+│   ├── mat/                       # B2: material library, rules, STEP tags, review, gating
+│   │   ├── library.py            # MaterialLibrary + load_library() (B2.1)
+│   │   ├── default_library.yaml  # seeded 14-entry library (B2.1)
+│   │   ├── rules.py              # SolidRef, NamingRule, apply_rules() (B2.3)
+│   │   ├── default_rules.yaml    # default regex→group_id ruleset (B2.3)
+│   │   ├── step_tags.py          # XCAF material-tag extraction, OCCT-optional (B2.2)
+│   │   ├── review.py             # auto-assignment review API (B2.4)
+│   │   └── gating.py             # run-readiness + density anomaly checks (B2.6)
 │   ├── ui/                        # placeholder — Stage B (PySide6 shell)
 │   └── report/                    # placeholder — Stage B (PDF/CSV)
 │
@@ -271,6 +279,26 @@ Key modules:
 - **`adapter`** (B1.6): Deterministic binary-STL writer (lex-sorted, 6-decimal rounding), translates tied groups through export index maps into `PreBuiltTiedGroups`. Three-flag override scheme for validation gates: `accept_warnings`, `accept_interference_fail`, `accept_watertightness_failures`. Overrides recorded on `ValidatedAssembly.overrides_used`.
 
 All modules guard OCC imports at call time. `pytest.importorskip("OCC.Core")` skips B1 tests without pythonocc-core.
+
+### 9c. Material Governance Layer (`raysim.mat`) — B2
+
+Phase B2 fills the `raysim.mat` package with the material governance layer. Every solid must resolve to a library material before a run (per `MVP_PLAN.md §4.8`). The layer produces the same `Material[]` and `MaterialAssignment[]` types the engine already consumes (`proj.schema`).
+
+Key modules:
+
+- **`library`** (B2.1): `MaterialLibrary` frozen dataclass wrapping `tuple[Material, ...]` with a `by_group_id` lookup. Ships a seeded 14-entry YAML (`default_library.yaml`): 11 base materials (Al 6061, Cu, Si, SiO₂, Kapton, FR4, Ti-6Al-4V, W, GaAs, Au, Sn-Pb solder) + 3 composites (battery, populated PCB, harness). User-extendable via `merge()`.
+- **`rules`** (B2.3): `SolidRef(solid_id, path_key, display_name)` is the stable input token. `NamingRule` maps a regex pattern to a `group_id` at a priority level. `apply_rules()` evaluates rules against all three `SolidRef` fields; highest-priority unique match wins, ties at the same priority and different `group_id` mark the solid ambiguous. Ships `default_rules.yaml` with 16 patterns.
+- **`step_tags`** (B2.2): OCCT-optional. `extract_step_tags(step_path, leaves)` reads XCAF material names and colors via `STEPCAFControl_Reader` + `XCAFDoc_MaterialTool`. Correlation with B1's `LeafSolid` list uses a two-gate verification (leaf count + per-leaf bbox fingerprint within 1e-3 mm) before zipping by DFS walk-order index. Falls back to empty tags on mismatch. `match_tags_to_library()` fuzzy-matches STEP strings to library entries.
+- **`review`** (B2.4): `build_review()` combines manual assignments, STEP tags, and naming rules with priority `manual > step_tag > naming_rule`. Invalid manual assignments (unknown `group_id`) remain unresolved — they are never overridden by auto-sources. `review_to_assignments()` converts to `MaterialAssignment[]`; raises `ValueError` on unresolved solids.
+- **`gating`** (B2.6): `check_run_readiness()` verifies every solid has an assignment resolving to a library entry. `check_density_anomalies()` flags `density_g_cm3 < 0.5` or `> 25.0` (warnings, not blockers).
+
+All modules except `step_tags` are pure Python and fully testable in the `uv`-based CI. `step_tags` guards OCC imports at call time.
+
+### 9d. Project File (`raysim.proj.project`) — B2
+
+The `.raysim` project file is a Pydantic model (`ProjectFile`) serialized via `canonical_json.dumps()`. `PROJECT_SCHEMA_VERSION = 1` (independent from the run-output `SCHEMA_VERSION`). Carries: `GeometryRef` (relative path + SHA-256 + tessellation params), `MaterialAssignment[]`, `assignment_sources` (traceability: step_tag / naming_rule / manual), `NamingRuleOverride[]`, `Detector[]`, dose curve ref, interference overrides, `created_at_utc`, `raysim_version`.
+
+Bit-stability contract: `save(load(save(project))) == save(project)` as bytes. `created_at_utc` is set once at creation and preserved verbatim on subsequent cycles. Geometry hash is verified on load; warns (does not fail) if stale. Loader accepts `PROJECT_SCHEMA_VERSION` and `PROJECT_SCHEMA_VERSION - 1`.
 
 ---
 

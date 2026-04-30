@@ -1,0 +1,89 @@
+# RaySim seeded material library — Phase B2.1
+# 14 entries: 11 base materials + 3 composites.
+# Densities sourced from NIST SRD 124 or vendor datasheets unless noted.
+
+materials:
+  - group_id: aluminum_6061
+    density_g_cm3: 2.70
+    z_eff: 13.0
+    display_name: Al 6061-T6
+    provenance: "NIST SRD 124, density for 6061-T6"
+
+  - group_id: copper
+    density_g_cm3: 8.96
+    z_eff: 29.0
+    display_name: Cu (OFHC)
+    provenance: "NIST"
+
+  - group_id: silicon
+    density_g_cm3: 2.33
+    z_eff: 14.0
+    display_name: Si (single crystal)
+    provenance: "NIST"
+
+  - group_id: silicon_dioxide
+    density_g_cm3: 2.20
+    z_eff: 10.8
+    display_name: "SiO₂ (fused silica)"
+    provenance: "NIST"
+
+  - group_id: kapton
+    density_g_cm3: 1.42
+    z_eff: 6.6
+    display_name: Kapton HN
+    provenance: "DuPont datasheet"
+
+  - group_id: fr4
+    density_g_cm3: 1.85
+    z_eff: 10.2
+    display_name: FR4 (glass-epoxy)
+    provenance: "IPC-4101 nominal"
+
+  - group_id: titanium_6al4v
+    density_g_cm3: 4.43
+    z_eff: 21.4
+    display_name: Ti-6Al-4V
+    provenance: "ASM Handbook"
+
+  - group_id: tungsten
+    density_g_cm3: 19.25
+    z_eff: 74.0
+    display_name: W (tungsten)
+    provenance: "NIST"
+
+  - group_id: gallium_arsenide
+    density_g_cm3: 5.32
+    z_eff: 31.5
+    display_name: GaAs
+    provenance: "NIST"
+
+  - group_id: gold
+    density_g_cm3: 19.32
+    z_eff: 79.0
+    display_name: Au
+    provenance: "NIST"
+
+  - group_id: sn_pb_solder
+    density_g_cm3: 8.50
+    z_eff: 47.4
+    display_name: Sn63/Pb37 solder
+    provenance: "IPC J-STD-006 nominal"
+
+  # Composites — effective densities for sector-analysis bulk shielding.
+  - group_id: battery
+    density_g_cm3: 2.10
+    z_eff: 12.0
+    display_name: Li-ion cell (avg)
+    provenance: "Typical 18650 cell, volume-averaged"
+
+  - group_id: populated_pcb
+    density_g_cm3: 2.40
+    z_eff: 14.0
+    display_name: Populated PCB (avg)
+    provenance: "Empirical average, FR4 + Cu + components"
+
+  - group_id: harness
+    density_g_cm3: 3.50
+    z_eff: 20.0
+    display_name: Cable harness (avg)
+    provenance: "Empirical average, Cu + Kapton + connectors"

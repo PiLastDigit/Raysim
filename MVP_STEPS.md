@@ -35,12 +35,12 @@ Use this section as the working tracker. Keep the detailed step definitions belo
 - [ ] B1.6 — Stage A adapter and STL export
 
 ### Phase B2
-- [ ] B2.1 — Material library
-- [ ] B2.2 — STEP AP214_IS material-tag ingestion
-- [ ] B2.3 — Naming-rules auto-assignment
-- [ ] B2.4 — Auto-assignment review
-- [ ] B2.5 — Project file format
-- [ ] B2.6 — Run gating and density anomaly warnings
+- [x] B2.1 — Material library
+- [x] B2.2 — STEP AP214_IS material-tag ingestion
+- [x] B2.3 — Naming-rules auto-assignment
+- [x] B2.4 — Auto-assignment review
+- [x] B2.5 — Project file format
+- [x] B2.6 — Run gating and density anomaly warnings
 
 ### Phase B3
 - [ ] B3.1 — Main window shell
