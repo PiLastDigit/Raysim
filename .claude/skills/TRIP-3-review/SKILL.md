@@ -34,8 +34,6 @@ Do **not** copy the checklist into your review output — link to it. The CR fil
 
 After completing the review, create a summary file in `docs/3-code-review/`.
 
-> Note for the codex-code-review iteration loop: this section is for the human-driven TRIP-3 review path only. The codex iteration loop handles archival via its `synthesize.tpl` step + the TRIP-2 "After convergence — synthesize, then promote" flow, *not* by generating a CR file per turn. If you are running under that loop, ignore this section.
-
 **File naming**: `CR_wa_vx.y.z.md` (a=project week, x.y.z=version)
 
 **Format**: render the canonical skeleton from `@.codex/skills/TRIP-3-review/cr-template.md`. That file is the single source of truth for the CR markdown structure — both this human-driven path and the Codex iteration loop's synthesize step write output that conforms to it, so a future reader can compare them apples-to-apples.
