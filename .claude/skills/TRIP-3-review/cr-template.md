@@ -1,21 +1,13 @@
 # Code Review Output Template
 
-This file is the **single source of truth** for the markdown skeleton
-of a RaySim code review record. Both review surfaces produce
-output that conforms to this skeleton:
+This file is the **single source of truth** for the markdown skeleton of a RaySim code review record. Both review surfaces produce output that conforms to this skeleton:
 
-- The human-driven `/TRIP-3-review` flow renders this skeleton into
-  `docs/3-code-review/CR_wa_vx.y.z.md` as the final committed review.
-- The Codex iteration loop's `synthesize.tpl` step renders the same
-  skeleton, which the requester then promotes to the same path.
+- The human-driven `/TRIP-3-review` flow renders this skeleton into `docs/3-code-review/CR_wa_vx.y.z.md` as the final committed review.
+- The Codex iteration loop's `synthesize.tpl` step renders the same skeleton, which the requester then promotes to the same path.
 
-Anything review-surface-specific (file naming, save location,
-iteration-loop sentinels, "where do findings come from") lives in
-the consuming SKILL.md / prompt, **not here**.
+Anything review-surface-specific (file naming, save location, iteration-loop sentinels, "where do findings come from") lives in the consuming SKILL.md / prompt, **not here**.
 
-Angle-bracket placeholders (`<like this>`) are filling-in instructions
-for the reviewer and must be replaced with concrete content before
-the file is committed.
+Angle-bracket placeholders (`<like this>`) are filling-in instructions for the reviewer and must be replaced with concrete content before the file is committed.
 
 ---
 
@@ -31,8 +23,7 @@ the file is committed.
 
 ## Executive Summary
 
-<1–3 sentences: what was changed and why. End with the verdict line:
-APPROVED / APPROVED with observations / NEEDS REVISION>
+<1–3 sentences: what was changed and why. End with the verdict line: APPROVED / APPROVED with observations / NEEDS REVISION>
 
 ---
 
@@ -46,9 +37,7 @@ APPROVED / APPROVED with observations / NEEDS REVISION>
 
 ### Critical Issues
 
-<For each Critical finding: short title, file:line, description, and
-disposition (addressed / accepted with override / open). If none,
-write "None.">
+<For each Critical finding: short title, file:line, description, and disposition (addressed / accepted with override / open). If none, write "None.">
 
 ### Major Issues
 
@@ -60,16 +49,13 @@ write "None.">
 
 ### Suggestions
 
-<Same format. Items not addressed are fine here — they're suggestions.
-If none, write "None.">
+<Same format. Items not addressed are fine here — they're suggestions. If none, write "None.">
 
 ---
 
 ## Checklist
 
-State each section's outcome (passed / passed with caveats / not
-applicable). One line per section, no expanded prose unless a
-caveat needs explanation.
+State each section's outcome (passed / passed with caveats / not applicable). One line per section, no expanded prose unless a caveat needs explanation.
 
 - [ ] 1. Functional Requirements — <outcome>
 - [ ] 2. Code Quality — <outcome>
@@ -82,11 +68,7 @@ caveat needs explanation.
 - [ ] 9. Performance — <outcome>
 - [ ] 10. Optional-Backend Hygiene — <outcome>
 
-Tick the box (`[x]`) for sections that passed cleanly. Leave
-unchecked with a one-line caveat for sections with open observations.
-The 10 section names match the criteria headings in
-`.codex/skills/TRIP-3-review/checklist.md` so a reader can cross-
-reference what was checked.
+Tick the box (`[x]`) for sections that passed cleanly. Leave unchecked with a one-line caveat for sections with open observations. The 10 section names match the criteria headings in `.codex/skills/TRIP-3-review/checklist.md` so a reader can cross-reference what was checked.
 
 ---
 
@@ -94,7 +76,5 @@ reference what was checked.
 
 **<APPROVED / APPROVED with observations / NEEDS REVISION>**
 
-<Final paragraph: anything a future reader should know — overrides
-applied, open findings the requester accepted, follow-up work
-deferred, etc.>
+<Final paragraph: anything a future reader should know — overrides applied, open findings the requester accepted, follow-up work deferred, etc.>
 ```
