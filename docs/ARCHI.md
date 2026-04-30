@@ -91,13 +91,20 @@ raysim/
 │   │   └── aggregator.py          # per-detector aggregation (Phase A.5)
 │   ├── ray/
 │   │   ├── healpix.py             # pix2vec — healpy or vendored fallback
-│   │   ├── scene.py               # STL loader + Embree BVH + tied groups (A.3)
+│   │   ├── scene.py               # STL loader + Embree BVH + tied groups (A.3) + PreBuiltTiedGroups (B1.6)
 │   │   └── tracer.py              # iterative closest-hit + stack accumulator (A.4)
 │   ├── proj/
 │   │   ├── schema.py              # Material / Detector / Provenance / RunResult
 │   │   ├── canonical_json.py      # deterministic JSON serializer
 │   │   └── hashing.py             # SHA-256 of canonical payloads
-│   ├── geom/                      # placeholder — Stage B (STEP ingest, healing)
+│   ├── geom/                      # B1: STEP ingest, tessellation, healing, overlap
+│   │   ├── step_loader.py        # STEP read + leaf walk (B1.1)
+│   │   ├── tessellation.py       # BRepMesh wrapper (B1.2)
+│   │   ├── healing.py            # healer + shell-orientation (B1.3)
+│   │   ├── watertightness.py     # per-shell edge-pair validator (B1.4)
+│   │   ├── overlap.py            # 4-way overlap diagnostic (B1.5)
+│   │   ├── pipeline.py           # orchestrator (B1.6)
+│   │   └── adapter.py            # STL export + Stage A handoff (B1.6)
 │   ├── mat/                       # placeholder — Stage B (library + assignment UI)
 │   ├── ui/                        # placeholder — Stage B (PySide6 shell)
 │   └── report/                    # placeholder — Stage B (PDF/CSV)
@@ -117,7 +124,8 @@ raysim/
 │   └── README.md
 │
 ├── scripts/
-│   └── build_benchmarks.py        # regenerates the benchmark corpus
+│   ├── build_benchmarks.py        # regenerates the STL benchmark corpus
+│   └── build_step_fixtures.py     # generates STEP fixtures (requires OCCT)
 │
 └── docs/
     ├── ARCHI.md                   # this file
@@ -245,7 +253,24 @@ Stage A consumes geometry as a directory of STL files: one file per `solid_id`, 
 
 Phase A's coincident-face detector hashes each triangle by its three **vertex coordinates** (rounded, sorted lex) — so two triangles from different solids with **identical vertex sets** form a tied group. This suffices for the concentric-shell acceptance fixture (Cu-outer / Al-inner-cavity coincide at R=20). Two coplanar triangles with the same plane but different triangulations are *not* paired by this hash; B1.5 will replace the detector with full coplanar-region classification.
 
-Stage B will replace this loader with `pythonocc-core` STEP ingest + tessellation + healing + watertightness validation, producing the same `BuiltScene`. Stage A's STL convention is also a regression-test path: Stage B will export STLs from STEP and re-run Stage A to verify equivalence.
+The `load_scene` function accepts an optional `tied_groups: PreBuiltTiedGroups` parameter (B1.6). When supplied by the STEP adapter, the in-line vertex-set detector is skipped and the pre-built groups populate `BuiltScene` directly. A `process_meshes=False` flag suppresses trimesh's internal vertex deduplication to preserve STL face order for the adapter's `triangle_index_map`.
+
+### 9b. STEP Geometry Pipeline (`raysim.geom`) — B1
+
+Phase B1 adds the STEP ingest path. The pipeline produces the same `BuiltScene` the Stage A engine consumes, via an STL-export-then-load adapter:
+
+`load_step` → `tessellate` (per leaf) → `heal_assembly` → `validate_watertightness` → `diagnose_overlaps` → `export_assembly_to_stl` → `load_scene_from_directory(tied_groups=...)`
+
+Key modules:
+
+- **`step_loader`** (B1.1): Reads STEP via `STEPControl_Reader`, walks the compound recursively into `LeafSolid` records with synthetic IDs (`solid_NNNN`) and path keys reflecting the tree structure.
+- **`tessellation`** (B1.2): `BRepMesh_IncrementalMesh` per leaf solid. Extracts per-shell triangle arrays in float64 with `loc.Transformation()` applied.
+- **`healing`** (B1.3): `BRepMesh_ModelHealer` pass + shell-orientation normalization. Classifies shells as OUTER or CAVITY via vertex-centroid containment. Per-shell probe rays verify orientation; flips are re-verified with full entry/exit stack-to-zero sequence check.
+- **`watertightness`** (B1.4): Per-shell edge-pairing with vertex canonicalization (1e-9 mm tolerance). Reports unpaired edges, same-orientation edges, degenerate triangles.
+- **`overlap`** (B1.5): Triangle-level vertex-match tied pairing + four-way solid-pair classification (`contact_only` / `accepted_nested` / `interference_warning` / `interference_fail`). B1 scope: topology-shared contacts only. Mismatched-tessellation contacts detected and gated via `MismatchedContactRegion` warnings.
+- **`adapter`** (B1.6): Deterministic binary-STL writer (lex-sorted, 6-decimal rounding), translates tied groups through export index maps into `PreBuiltTiedGroups`. Three-flag override scheme for validation gates: `accept_warnings`, `accept_interference_fail`, `accept_watertightness_failures`. Overrides recorded on `ValidatedAssembly.overrides_used`.
+
+All modules guard OCC imports at call time. `pytest.importorskip("OCC.Core")` skips B1 tests without pythonocc-core.
 
 ---
 

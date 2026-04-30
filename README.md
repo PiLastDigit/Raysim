@@ -6,7 +6,7 @@ See [`MVP_PLAN.md`](MVP_PLAN.md) for scope and decisions, [`MVP_STEPS.md`](MVP_S
 
 ## Project status
 
-Phase 0 — scaffolding and spikes. Not yet runnable end-to-end.
+**v0.1.0** — Phase A complete (headless `raysim run` CLI). Phase B1 geometry pipeline landed: STEP loader, tessellation, healing, watertightness validation, overlap diagnostic, and Stage A adapter. STEP→engine round-trip functional; STEP fixtures require `pythonocc-core` (conda-only).
 
 ## Quickstart (development)
 

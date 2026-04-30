@@ -55,6 +55,18 @@ class SolidEntry:
     bbox_max_mm: tuple[float, float, float]
 
 
+@dataclass(frozen=True)
+class PreBuiltTiedGroups:
+    """Pre-built coincident-face groups from the geometry pipeline (B1.5).
+
+    Replaces the in-line vertex-set detector when the STEP path has richer
+    information.  Used exclusively by ``raysim.geom.adapter``.
+    """
+
+    tied_group_id_per_geom: tuple[NDArray[np.int32], ...]
+    tied_group_members: Mapping[int, tuple[tuple[int, int], ...]]
+
+
 @dataclass
 class BuiltScene:
     """Assembled Embree scene + the metadata the traversal needs.
@@ -107,6 +119,9 @@ def load_scene_from_directory(
     directory: str | Path,
     materials: Sequence[Material],
     assignments: Sequence[MaterialAssignment] | None = None,
+    *,
+    tied_groups: PreBuiltTiedGroups | None = None,
+    process_meshes: bool = True,
 ) -> BuiltScene:
     """Load a directory of STLs (one file per ``solid_id``) into a scene.
 
@@ -115,6 +130,16 @@ def load_scene_from_directory(
     to a library ``material_group_id``; if omitted, ``solid_id`` is treated as
     the material group id directly (so the canonical ``aluminum.stl`` →
     ``"aluminum"`` material).
+
+    Parameters
+    ----------
+    tied_groups :
+        When supplied (from the STEP geometry pipeline), skip the in-line
+        vertex-set coincident-face detector and use these pre-built groups.
+    process_meshes :
+        When ``False``, pass ``process=False`` to ``trimesh.load`` to preserve
+        STL face order.  Used by the B1.6 adapter to maintain the
+        ``triangle_index_map`` → Embree ``primID`` correspondence.
     """
     directory = Path(directory)
     if not directory.is_dir():
@@ -123,13 +148,17 @@ def load_scene_from_directory(
     if not stl_paths:
         raise FileNotFoundError(f"no STL files in scene directory: {directory}")
     entries: list[tuple[str, Path]] = [(p.stem, p) for p in stl_paths]
-    return load_scene(entries, materials, assignments)
+    return load_scene(entries, materials, assignments,
+                      tied_groups=tied_groups, process_meshes=process_meshes)
 
 
 def load_scene(
     solids: Iterable[tuple[str, str | Path]],
     materials: Sequence[Material],
     assignments: Sequence[MaterialAssignment] | None = None,
+    *,
+    tied_groups: PreBuiltTiedGroups | None = None,
+    process_meshes: bool = True,
 ) -> BuiltScene:
     """Build an Embree scene from an explicit ``[(solid_id, stl_path), ...]``."""
     # Resolve material lookup.
@@ -158,7 +187,10 @@ def load_scene(
 
     for geom_id, (solid_id, stl_path) in enumerate(solids):
         path = Path(stl_path)
-        mesh = trimesh.load(path, force="mesh")
+        if process_meshes:
+            mesh = trimesh.load(path, force="mesh")
+        else:
+            mesh = trimesh.load(path, force="mesh", process=False)
         if not isinstance(mesh, trimesh.Trimesh):  # pragma: no cover - defensive
             raise ValueError(f"{path}: not a triangle mesh")
         verts = np.asarray(mesh.vertices, dtype=np.float64)
@@ -217,12 +249,24 @@ def load_scene(
 
     bbox_diag = float(np.linalg.norm(bbox_max - bbox_min))
 
-    # Pre-build coincident-face groups across all geoms, with a tolerance
-    # scaled by the scene bbox diagonal (1e-6 × diag).
-    tol_mm = max(1e-9, 1e-6 * bbox_diag)
-    tied_group_id_per_geom, tied_group_members = _build_tied_groups(
-        all_vertices, all_faces, tol_mm
-    )
+    # Coincident-face groups: use pre-built groups from the STEP pipeline
+    # when supplied, otherwise detect via vertex-set hashing.
+    if tied_groups is not None:
+        tied_group_id_per_geom_result: list[NDArray[np.int32]] = list(
+            tied_groups.tied_group_id_per_geom
+        )
+        tied_group_members_result: dict[int, tuple[tuple[int, int], ...]] = dict(
+            tied_groups.tied_group_members
+        )
+        _LOG.info(
+            "scene.prebuilt_tied_groups",
+            n_groups=len(tied_group_members_result),
+        )
+    else:
+        tol_mm = max(1e-9, 1e-6 * bbox_diag)
+        tied_group_id_per_geom_result, tied_group_members_result = _build_tied_groups(
+            all_vertices, all_faces, tol_mm
+        )
 
     embree_scene.commit() if hasattr(embree_scene, "commit") else None
 
@@ -232,8 +276,8 @@ def load_scene(
         density_per_geom=np.asarray(densities, dtype=np.float64),
         solid_id_per_geom=tuple(solid_ids),
         triangle_normals_per_geom=tuple(triangle_normals),
-        tied_group_id_per_geom=tuple(tied_group_id_per_geom),
-        tied_group_members=tied_group_members,
+        tied_group_id_per_geom=tuple(tied_group_id_per_geom_result),
+        tied_group_members=tied_group_members_result,
         bbox_min_mm=(float(bbox_min[0]), float(bbox_min[1]), float(bbox_min[2])),
         bbox_max_mm=(float(bbox_max[0]), float(bbox_max[1]), float(bbox_max[2])),
         bbox_diag_mm=bbox_diag,

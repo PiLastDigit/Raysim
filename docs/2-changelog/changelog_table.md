@@ -2,11 +2,20 @@
 
 | Version | Week | Commit Message |
 | ------- | ---- | -------------- |
+| `0.1.0` | 1    | Add Phase B1 geometry pipeline: STEP loader, tessellation, healing, overlap, adapter |
 | `0.0.2` | 1    | chore: initialize TRIP workflow |
 
 ---
 
 # Changelog Summary
+
+- **v0.1.0 (Phase B1 Geometry Pipeline — Week 1, 30-04-2026)**:
+  - **New package**: `raysim.geom` — STEP loader, tessellation, healing,
+    watertightness, overlap diagnostic, pipeline orchestrator, adapter.
+  - **Additive change**: `raysim.ray.scene` gains `PreBuiltTiedGroups`,
+    `tied_groups` parameter, and `process_meshes` flag.
+  - **Fixture generator**: `scripts/build_step_fixtures.py` (10 STEP fixtures).
+  - **Tests**: 7 new OCCT-dependent test files (skipped without pythonocc-core).
 
 - **v0.0.2 (TRIP Initialization — Week 1, 28-04-2026)**:
   - **Setup**: Initialized TRIP workflow. Project classified as a
