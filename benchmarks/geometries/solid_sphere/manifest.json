@@ -1,9 +1,9 @@
 {
   "files": {
     "aluminum": {
-      "n_triangles": 15872,
+      "n_triangles": 20480,
       "path": "benchmarks/geometries/solid_sphere/aluminum.stl",
-      "sha256": "623c91d07f55343fe7f55741f623d05958dae467f6f257f6e6b6f8efd87c0a68"
+      "sha256": "0c2a07cb5dff8c44a9b8f489af3d77de5730c739e7e438fb8b4972dd3517013b"
     }
   }
 }

@@ -128,7 +128,7 @@ Wire the `omere_dos` importer from 0.3 into a `DoseDepthCurve` consumer. Build t
 **Done when:** dose lookup at any thickness ≤ 1% relative against source rows; per-species lookups available; the three edge cases above are covered by unit tests with clear failure messages.
 
 ### A.3 — Scene loader and Embree BVH
-STL/OBJ loader via `trimesh`. Two scene formats: subdirectory-of-STLs convention (one subdir per material `group_id`) and OBJ-with-groups. Build an Embree scene with per-triangle material indices that map back to the materials CSV. Compute scene bounding box for downstream epsilon scaling.
+STL loader via `trimesh`. Scene format: a flat directory of `*.stl` files, one per solid; file stem becomes the `solid_id`. Material mapping via an optional `MaterialAssignment[]` JSON; when omitted, `solid_id` is treated as the `material_group_id` directly. Build an Embree scene with per-triangle material indices that map back to the materials CSV. Compute scene bounding box for downstream epsilon scaling.
 
 **Done when:** loading the canonical aluminum-box STL produces a watertight Embree BVH whose ray-cast against an external ray returns expected hit positions to `float32` precision.
 

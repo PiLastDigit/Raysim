@@ -85,11 +85,6 @@ def test_a7_2_uniform_shield_dose_within_0p1_pct() -> None:
     det = Detector(name="center", position_xyz_mm=(0.0, 0.0, 0.0))
     res = aggregate_detector(scene, spline, det, nside=16)
 
-    # The triangulated uv_sphere has chord-length jitter < 1% RMS; the spline
-    # is flat enough at 50 mm that the dose-averaged result tracks the
-    # interpolated value to ≤ 0.5% in practice. We verify the looser MVP_PLAN
-    # bound here (±0.1% would require an exact sphere; that's a B5 cross-tool
-    # comparison level of validation).
     expected_chord_mm = 50.0
     expected_sigma_rho_l = expected_chord_mm * 0.1 * 2.70  # 13.5 g/cm²
     expected_mm_al = expected_sigma_rho_l / RHO_AL_REF_G_CM3 * 10.0  # 50 mm
@@ -97,10 +92,8 @@ def test_a7_2_uniform_shield_dose_within_0p1_pct() -> None:
 
     rel_chord = abs(res.sigma_rho_l_mean_g_cm2 - expected_sigma_rho_l) / expected_sigma_rho_l
     rel_dose = abs(res.dose_total_krad - expected_dose) / expected_dose
-    # uv_sphere(64,64) gives <0.5% chord-length error; the dose lookup is
-    # roughly linear in mm_al at this depth so 0.5% propagates ≈ 1:1.
-    assert rel_chord < 5e-3, f"uniform-shield ∑ρL off by {rel_chord:.3%}"
-    assert rel_dose < 5e-3, f"uniform-shield dose off by {rel_dose:.3%}"
+    assert rel_chord < 1e-3, f"uniform-shield ∑ρL off by {rel_chord:.3%}"
+    assert rel_dose < 1e-3, f"uniform-shield dose off by {rel_dose:.3%}"
 
 
 # ---------------------------------------------------------------------------

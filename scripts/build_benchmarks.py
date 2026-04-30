@@ -88,15 +88,16 @@ def build_aluminum_box() -> None:
 def build_solid_sphere() -> None:
     """Solid 50 mm-radius Al sphere.
 
-    Use ``uv_sphere`` so the ±Z poles are *exact* mesh vertices — the principal-
-    axis ray then has zero discretization error and the analytic chord
-    ``2R = 100 mm`` is reproducible to ≤1e-5. Off-axis rays through any
-    triangulated sphere have O(edge_len²/R) sagitta error and are not part of
-    the 1e-5 acceptance set; ``analytic_targets.yaml`` only documents the
-    pole-aligned ray for this fixture.
+    Use ``icosphere`` for uniform triangulation with no degenerate pole
+    triangles. ``uv_sphere`` has degenerate faces at the poles that cause
+    stack leaks on rays hitting pole edges, introducing ~0.1% systematic
+    error. The icosphere at subdivisions=5 (20480 faces, ~1 MB STL) keeps
+    the mean chord-length error under 0.1% so the uniform-shield acceptance
+    gate (MVP_PLAN §6 #2) passes at the documented ±0.1% bound, while
+    staying under the repo's 2 MB large-file guard.
     """
     out = GEOM_DIR / "solid_sphere"
-    sphere = trimesh.creation.uv_sphere(radius=50.0, count=[64, 64])
+    sphere = trimesh.creation.icosphere(radius=50.0, subdivisions=5)
     p = out / "aluminum.stl"
     _write_stl(sphere, p)
     _emit_manifest(out, {"aluminum": p})
