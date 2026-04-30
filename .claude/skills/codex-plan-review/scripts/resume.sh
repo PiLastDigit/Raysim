@@ -47,10 +47,11 @@ THREAD_ID="$(cat "$THREAD_FILE")"
 
 PROMPT="$(load_prompt "$PROMPT_FILE")"
 
+# resume inherits sandbox from the original session; --sandbox and --color
+# are not accepted by `codex exec resume`.
 codex exec resume "$THREAD_ID" \
     --skip-git-repo-check \
-    --sandbox read-only \
-    --color never \
+    --json \
     -o "$REVIEW_FILE" \
     "$PROMPT" \
     </dev/null \
