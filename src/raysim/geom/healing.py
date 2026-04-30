@@ -110,28 +110,20 @@ def _classify_shell_roles(
     if len(shells) == 1:
         return [ShellRole.OUTER]
 
-    centroids = [s.vertices.mean(axis=0) for s in shells]
-    roles: list[ShellRole] = []
+    # The outer shell has the largest bounding-box diagonal.
+    # This is more robust than centroid containment for concentric shapes
+    # where all centroids coincide.
+    diags = []
+    for s in shells:
+        bb_min = s.vertices.min(axis=0)
+        bb_max = s.vertices.max(axis=0)
+        diags.append(float(np.linalg.norm(bb_max - bb_min)))
 
-    for i, _shell_i in enumerate(shells):
-        is_contained = False
-        for j, shell_j in enumerate(shells):
-            if i == j:
-                continue
-            if _point_in_shell(centroids[i], shell_j):
-                is_contained = True
-                break
-        roles.append(ShellRole.CAVITY if is_contained else ShellRole.OUTER)
-
-    n_outer = sum(1 for r in roles if r == ShellRole.OUTER)
-    if n_outer != 1:
-        _LOG.warning(
-            "healing.ambiguous_outer",
-            n_outer=n_outer,
-            n_shells=len(shells),
-        )
-        if n_outer == 0 and roles:
-            roles[0] = ShellRole.OUTER
+    outer_idx = int(np.argmax(diags))
+    roles: list[ShellRole] = [
+        ShellRole.OUTER if i == outer_idx else ShellRole.CAVITY
+        for i in range(len(shells))
+    ]
 
     return roles
 

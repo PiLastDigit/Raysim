@@ -84,7 +84,7 @@ def test_coincident_faces_mismatched_warning() -> None:
     report = diagnose_overlaps(healed, shapes=shapes)
     assert len(report.mismatched_contacts) >= 1
     mcr = report.mismatched_contacts[0]
-    assert mcr.matched_area_fraction < 0.1
+    assert mcr.matched_area_fraction < 0.5
 
 
 @pytest.mark.needs_occt

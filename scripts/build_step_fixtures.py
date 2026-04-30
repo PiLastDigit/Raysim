@@ -167,23 +167,32 @@ def build_interference_partial_large() -> Path:
 
 
 def build_coincident_faces() -> Path:
-    """Two boxes sharing a face via BRepBuilderAPI_Sewing (topology-shared).
+    """Two boxes sharing a face via BRepAlgoAPI_Splitter (topology-shared).
 
-    Both boxes share the face at X=50 — BRepMesh produces identical
-    triangulations on both sides.
+    A 200×100×100 box is split in half by a plane at X=0, producing two
+    100×100×100 solids that share the cut face with identical topology.
+    BRepMesh produces identical triangulations on both sides.
     """
-    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Sewing
+    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Splitter
+    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+    from OCC.Core.gp import gp_Dir, gp_Pln, gp_Pnt
+    from OCC.Core.TopTools import TopTools_ListOfShape
 
-    box_a = _make_box(100, 100, 100)
-    box_b = _translate(_make_box(100, 100, 100), 100, 0, 0)
+    box = _make_box(200, 100, 100)
+    plane = gp_Pln(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
+    splitter_face = BRepBuilderAPI_MakeFace(plane, -60, 60, -60, 60).Face()
 
-    sew = BRepBuilderAPI_Sewing(1e-6)
-    sew.Add(box_a)
-    sew.Add(box_b)
-    sew.Perform()
-    sewn = sew.SewedShape()
+    splitter = BRepAlgoAPI_Splitter()
+    args = TopTools_ListOfShape()
+    args.Append(box)
+    tools = TopTools_ListOfShape()
+    tools.Append(splitter_face)
+    splitter.SetArguments(args)
+    splitter.SetTools(tools)
+    splitter.Build()
+
     p = STEP_DIR / "coincident_faces.step"
-    _write_step(sewn, p)
+    _write_step(splitter.Shape(), p)
     return p
 
 

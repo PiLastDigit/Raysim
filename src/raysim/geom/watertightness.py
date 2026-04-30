@@ -137,7 +137,9 @@ def _check_shell(
         elif entries[0][1] == entries[1][1]:
             same_orient.append(edge_key)
 
-    pass_ = len(unpaired) == 0 and len(same_orient) == 0 and len(degenerate) == 0
+    # Degenerate triangles (e.g. OCCT sphere pole tris) are dropped from the
+    # edge check but don't fail watertightness — they don't create open edges.
+    pass_ = len(unpaired) == 0 and len(same_orient) == 0
 
     return ShellWatertightness(
         shell_index=shell_index,
