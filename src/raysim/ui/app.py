@@ -205,9 +205,30 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
         event.accept()  # type: ignore[attr-defined]
 
 
+def _setup_conda_dll_path() -> None:
+    """Add conda env's Library/bin to DLL search path on Windows.
+
+    When running Python directly (without micromamba activate), OCCT's
+    shared libraries in Library/bin are not on PATH. This adds them
+    via os.add_dll_directory so OCCT imports don't crash silently.
+    """
+    import os
+    import platform
+
+    if platform.system() != "Windows":
+        return
+    env_root = os.path.dirname(sys.executable)
+    dll_path = os.path.join(env_root, "Library", "bin")
+    if os.path.isdir(dll_path):
+        os.add_dll_directory(dll_path)
+        os.environ["PATH"] = dll_path + ";" + os.environ.get("PATH", "")
+
+
 def launch() -> None:
     """Entry point for ``raysim gui``."""
     from PySide6.QtCore import QTimer
+
+    _setup_conda_dll_path()
 
     app = QApplication.instance() or QApplication(sys.argv)
     window = MainWindow()

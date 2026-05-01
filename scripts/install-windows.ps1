@@ -131,15 +131,18 @@ Write-Host "  raysim installed" -ForegroundColor Green
 # --- Step 4: Create launcher scripts ---
 Write-Host "[4/4] Creating launcher scripts..." -ForegroundColor Yellow
 
-# Command-line launcher (must use CRLF for CMD to parse it)
+# Python executable in the conda env (bypasses micromamba activation to avoid CMD line-length limit)
+$PythonExe = Join-Path $EnvPath "python.exe"
+
+# Command-line launcher
 $CliLauncher = Join-Path $ProjectRoot "raysim.cmd"
-$cmdContent = "@echo off`r`nset MAMBA_ROOT_PREFIX=$MambaRoot`r`n""$MambaExe"" run -n $EnvName raysim %*`r`n"
+$cmdContent = "@echo off`r`n""$PythonExe"" -m raysim.cli.main %*`r`n"
 [System.IO.File]::WriteAllText($CliLauncher, $cmdContent)
 Write-Host "  Created $CliLauncher"
 
 # GUI launcher (hides console window)
 $GuiLauncher = Join-Path $ProjectRoot "raysim-gui.vbs"
-$vbsContent = "Set WshShell = CreateObject(""WScript.Shell"")`r`nWshShell.Environment(""Process"")(""MAMBA_ROOT_PREFIX"") = ""$MambaRoot""`r`nWshShell.Run """"""$MambaExe"""""" run -n $EnvName raysim gui"", 0, False`r`n"
+$vbsContent = "Set WshShell = CreateObject(""WScript.Shell"")`r`nWshShell.Run """"""$PythonExe"""""" -m raysim.cli.main gui"", 0, False`r`n"
 [System.IO.File]::WriteAllText($GuiLauncher, $vbsContent)
 Write-Host "  Created $GuiLauncher (double-click to launch GUI)"
 
