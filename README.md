@@ -66,38 +66,39 @@ uv run raysim run \
 
 ### Desktop application (GUI)
 
-The GUI requires `pythonocc-core` (conda-only) and `PySide6`. The recommended setup uses [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html):
+The GUI requires `pythonocc-core` (conda-only) and `PySide6`. Install scripts handle everything automatically -- micromamba download, environment creation, and launcher setup.
 
-```bash
-# Install micromamba (Linux/macOS)
-curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
-
-# Create environment with all dependencies
-./bin/micromamba create -n raysim-ui python=3.12 \
-    pythonocc-core=7.9.0 pyside6 matplotlib pyqtgraph \
-    -c conda-forge -y
-
-# Install raysim into the environment
-./bin/micromamba run -n raysim-ui pip install -e ".[ray,ui]"
-
-# Launch
-./bin/micromamba run -n raysim-ui raysim gui
-```
-
-On **Windows** (PowerShell):
+**Windows** (PowerShell):
 
 ```powershell
-# Install micromamba
-irm https://micro.mamba.pm/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
+```
 
-# Create environment
-micromamba create -n raysim-ui python=3.12 `
-    pythonocc-core=7.9.0 pyside6 matplotlib pyqtgraph `
-    -c conda-forge -y
+This creates a desktop shortcut and `raysim.cmd` / `raysim-gui.vbs` launchers. Double-click the desktop icon to start the GUI.
 
-# Install and launch
-micromamba run -n raysim-ui pip install -e ".[ray,ui]"
-micromamba run -n raysim-ui raysim gui
+**Linux / macOS**:
+
+```bash
+bash scripts/install-linux.sh
+```
+
+This creates a `raysim.sh` launcher:
+
+```bash
+./raysim.sh gui          # launch the GUI
+./raysim.sh run ...      # headless CLI
+```
+
+**Manual setup** (if you prefer to control the steps):
+
+```bash
+# Download micromamba, create env, install
+curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+export MAMBA_ROOT_PREFIX=.micromamba
+./bin/micromamba create -n raysim-ui python=3.12 \
+    pythonocc-core=7.9.0 pyside6 matplotlib pyqtgraph -c conda-forge -y
+./bin/micromamba run -n raysim-ui pip install -e ".[ray,ui]"
+./bin/micromamba run -n raysim-ui raysim gui
 ```
 
 ### Lint and type check
