@@ -36,6 +36,29 @@ Write-Host ""
 Write-Host "Project root: $ProjectRoot"
 Write-Host ""
 
+# --- Pre-check: Windows long paths ---
+$longPathKey = "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem"
+$longPathEnabled = $false
+try {
+    $val = (Get-ItemProperty -Path $longPathKey -Name "LongPathsEnabled" -ErrorAction Stop).LongPathsEnabled
+    $longPathEnabled = ($val -eq 1)
+} catch {}
+
+if ($longPathEnabled) {
+    Write-Host "[pre] Windows long paths: ENABLED" -ForegroundColor Green
+} else {
+    Write-Host "[pre] Windows long paths: DISABLED" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Qt6 requires long path support (paths exceed 260 chars)." -ForegroundColor Yellow
+    Write-Host "  Open an ADMIN PowerShell and run:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host '    reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f' -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Then close and reopen PowerShell, and re-run this script." -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
+
 # --- Step 1: Micromamba ---
 if (Test-Path $MambaExe) {
     Write-Host "[1/4] micromamba already installed" -ForegroundColor Green
