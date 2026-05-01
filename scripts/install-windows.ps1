@@ -25,7 +25,7 @@ $EnvName = "raysim-ui"
 $PythonVersion = "3.12"
 $OcctVersion = "7.9.0"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$MambaRoot = Join-Path $ProjectRoot ".micromamba"
+$MambaRoot = Join-Path $env:LOCALAPPDATA "raysim-micromamba"
 $MambaExe = Join-Path $ProjectRoot "bin\micromamba.exe"
 
 Write-Host ""
@@ -67,6 +67,10 @@ if (Test-Path $MambaExe) {
 }
 
 $env:MAMBA_ROOT_PREFIX = $MambaRoot
+
+# Ensure the condabin directory exists (micromamba needs to write activation scripts there)
+$CondaBin = Join-Path $MambaRoot "condabin"
+if (-not (Test-Path $CondaBin)) { New-Item -ItemType Directory -Path $CondaBin -Force | Out-Null }
 
 # --- Step 2: Create conda environment ---
 $EnvPath = Join-Path $MambaRoot "envs\$EnvName"
