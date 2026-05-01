@@ -41,12 +41,33 @@ class AssemblyNode:
     name: str | None = None
 
 
+_xcaf_available: bool | None = None
+
+
+def _check_xcaf_available() -> bool:
+    """Probe whether the XCAF reader works without crashing."""
+    global _xcaf_available
+    if _xcaf_available is not None:
+        return _xcaf_available
+    try:
+        from OCC.Core.TCollection import TCollection_ExtendedString
+        from OCC.Core.TDocStd import TDocStd_Document
+        from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
+
+        handle = TDocStd_Document(TCollection_ExtendedString("XDE"))
+        _tool = XCAFDoc_DocumentTool.ShapeTool(handle.Main())
+        _xcaf_available = True
+    except Exception:
+        _xcaf_available = False
+    return _xcaf_available
+
+
 def load_step(path: str | Path) -> AssemblyNode:
     """Read a STEP file and return the assembly tree with leaf solids.
 
-    Tries the XCAF reader first (provides names, colors, material hints).
-    Falls back to the plain STEPControl_Reader if XCAF crashes or fails
-    (known issue with some pythonocc-core builds on Windows).
+    Uses the XCAF reader when available (provides names, colors, material
+    hints). Falls back to the plain STEPControl_Reader on builds where
+    XCAF crashes (known issue with pythonocc-core novtk on Windows).
 
     Raises ``ValueError`` on empty STEP (no solids) or read failure.
     """
@@ -54,10 +75,14 @@ def load_step(path: str | Path) -> AssemblyNode:
     if not path.exists():
         raise FileNotFoundError(f"STEP file not found: {path}")
 
-    try:
-        root_node = _load_step_xcaf(path)
-    except Exception:
-        _LOG.info("step_loader.xcaf_failed_fallback_to_plain", path=str(path))
+    if _check_xcaf_available():
+        try:
+            root_node = _load_step_xcaf(path)
+        except Exception:
+            _LOG.info("step_loader.xcaf_failed_fallback_to_plain", path=str(path))
+            root_node = _load_step_plain(path)
+    else:
+        _LOG.info("step_loader.using_plain_reader", path=str(path))
         root_node = _load_step_plain(path)
 
     leaves = list(iter_leaves(root_node))
