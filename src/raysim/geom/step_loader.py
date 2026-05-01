@@ -44,17 +44,37 @@ class AssemblyNode:
 def load_step(path: str | Path) -> AssemblyNode:
     """Read a STEP file and return the assembly tree with leaf solids.
 
+    Tries the XCAF reader first (provides names, colors, material hints).
+    Falls back to the plain STEPControl_Reader if XCAF crashes or fails
+    (known issue with some pythonocc-core builds on Windows).
+
     Raises ``ValueError`` on empty STEP (no solids) or read failure.
     """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"STEP file not found: {path}")
+
+    try:
+        root_node = _load_step_xcaf(path)
+    except Exception:
+        _LOG.info("step_loader.xcaf_failed_fallback_to_plain", path=str(path))
+        root_node = _load_step_plain(path)
+
+    leaves = list(iter_leaves(root_node))
+    if not leaves:
+        raise ValueError(f"STEP file contains no solids: {path}")
+
+    _LOG.info("step_loader.loaded", path=str(path), n_solids=len(leaves))
+    return root_node
+
+
+def _load_step_xcaf(path: Path) -> AssemblyNode:
+    """Load via STEPCAFControl_Reader (XCAF — names, colors, material hints)."""
     from OCC.Core.IFSelect import IFSelect_RetDone
     from OCC.Core.STEPCAFControl import STEPCAFControl_Reader
     from OCC.Core.TCollection import TCollection_ExtendedString
     from OCC.Core.TDocStd import TDocStd_Document
     from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
-
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"STEP file not found: {path}")
 
     handle = TDocStd_Document(TCollection_ExtendedString("XDE"))
     reader = STEPCAFControl_Reader()
@@ -72,13 +92,66 @@ def load_step(path: str | Path) -> AssemblyNode:
     color_tool = XCAFDoc_DocumentTool.ColorTool(handle.Main())
     mat_tool = XCAFDoc_DocumentTool.MaterialTool(handle.Main())
 
-    root_node = _build_tree_xcaf(shape_tool, color_tool, mat_tool)
-    leaves = list(iter_leaves(root_node))
-    if not leaves:
-        raise ValueError(f"STEP file contains no solids: {path}")
+    return _build_tree_xcaf(shape_tool, color_tool, mat_tool)
 
-    _LOG.info("step_loader.loaded", path=str(path), n_solids=len(leaves))
-    return root_node
+
+def _load_step_plain(path: Path) -> AssemblyNode:
+    """Fallback: load via STEPControl_Reader (no XCAF metadata)."""
+    from OCC.Core.Bnd import Bnd_Box
+    from OCC.Core.BRepBndLib import brepbndlib
+    from OCC.Core.IFSelect import IFSelect_RetDone
+    from OCC.Core.STEPControl import STEPControl_Reader
+    from OCC.Core.TopAbs import TopAbs_COMPOUND, TopAbs_COMPSOLID, TopAbs_SOLID
+    from OCC.Core.TopoDS import TopoDS_Iterator, topods
+
+    reader = STEPControl_Reader()
+    status = reader.ReadFile(str(path))
+    if status != IFSelect_RetDone:
+        raise ValueError(f"STEP read failed (status {status}): {path}")
+
+    reader.TransferRoots()
+    root_shape = reader.OneShape()
+    if root_shape is None:
+        raise ValueError(f"STEP file contains no shapes: {path}")
+
+    counter = [0]
+
+    def _walk(shape: object, prefix: str) -> AssemblyNode:
+        shape_type = shape.ShapeType()  # type: ignore[attr-defined]
+
+        if shape_type == TopAbs_SOLID:
+            solid = topods.Solid(shape)
+            solid_id = f"solid_{counter[0]:04d}"
+            counter[0] += 1
+            bbox = Bnd_Box()
+            brepbndlib.Add(solid, bbox)
+            xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
+            leaf = LeafSolid(
+                solid_id=solid_id,
+                path_key=prefix or "0",
+                shape=solid,
+                bbox_min_mm=(xmin, ymin, zmin),
+                bbox_max_mm=(xmax, ymax, zmax),
+            )
+            return AssemblyNode(path_key=prefix or "0", children=(), leaf=leaf)
+
+        if shape_type in (TopAbs_COMPOUND, TopAbs_COMPSOLID):
+            children: list[AssemblyNode] = []
+            it = TopoDS_Iterator(shape)
+            child_idx = 0
+            while it.More():
+                child = it.Value()
+                child_prefix = f"{prefix}/{child_idx}" if prefix else str(child_idx)
+                children.append(_walk(child, child_prefix))
+                child_idx += 1
+                it.Next()
+            return AssemblyNode(
+                path_key=prefix, children=tuple(children), leaf=None,
+            )
+
+        return AssemblyNode(path_key=prefix, children=(), leaf=None)
+
+    return _walk(root_shape, "")
 
 
 def iter_leaves(node: AssemblyNode) -> Iterator[LeafSolid]:
