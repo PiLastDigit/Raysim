@@ -140,10 +140,11 @@ $cmdContent = "@echo off`r`n""$PythonExe"" -m raysim.cli.main %*`r`n"
 [System.IO.File]::WriteAllText($CliLauncher, $cmdContent)
 Write-Host "  Created $CliLauncher"
 
-# GUI launcher (hides console window)
+# GUI launcher (uses pythonw.exe for no console window)
 $GuiLauncher = Join-Path $ProjectRoot "raysim-gui.vbs"
+$PythonwExe = Join-Path $EnvPath "pythonw.exe"
 $vbsLine1 = 'Set WshShell = CreateObject("WScript.Shell")'
-$vbsLine2 = 'WshShell.Run """' + $PythonExe + '"" -m raysim.cli.main gui", 0, False'
+$vbsLine2 = 'WshShell.Run """' + $PythonwExe + '"" -m raysim.cli.main gui", 1, False'
 $vbsContent = $vbsLine1 + "`r`n" + $vbsLine2 + "`r`n"
 [System.IO.File]::WriteAllText($GuiLauncher, $vbsContent)
 Write-Host "  Created $GuiLauncher (double-click to launch GUI)"
