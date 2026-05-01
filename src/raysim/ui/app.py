@@ -220,7 +220,7 @@ def _setup_conda_dll_path() -> None:
     env_root = os.path.dirname(sys.executable)
     dll_path = os.path.join(env_root, "Library", "bin")
     if os.path.isdir(dll_path):
-        os.add_dll_directory(dll_path)
+        os.add_dll_directory(dll_path)  # type: ignore[attr-defined]
         os.environ["PATH"] = dll_path + ";" + os.environ.get("PATH", "")
 
 
