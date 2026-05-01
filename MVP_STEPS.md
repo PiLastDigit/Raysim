@@ -43,14 +43,14 @@ Use this section as the working tracker. Keep the detailed step definitions belo
 - [x] B2.6 — Run gating and density anomaly warnings
 
 ### Phase B3
-- [ ] B3.0 — XCAF migration: unify STEP loader on STEPCAFControl_Reader
-- [ ] B3.1 — Main window shell
-- [ ] B3.2 — OCCT AIS viewer integration with picking
-- [ ] B3.3 — Material assignment UI
-- [ ] B3.4 — Detector placement
-- [ ] B3.5 — Scenario panel
-- [ ] B3.6 — Run dispatcher
-- [ ] B3.7 — Result overlays
+- [x] B3.0 — XCAF migration: unify STEP loader on STEPCAFControl_Reader
+- [x] B3.1 — Main window shell
+- [x] B3.2 — OCCT AIS viewer integration with picking
+- [x] B3.3 — Material assignment UI
+- [x] B3.4 — Detector placement
+- [x] B3.5 — Scenario panel
+- [x] B3.6 — Run dispatcher
+- [x] B3.7 — Result overlays
 
 ### Phase B4
 - [ ] B4.1 — Report data model and PDF generator
