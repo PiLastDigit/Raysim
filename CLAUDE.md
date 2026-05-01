@@ -70,6 +70,12 @@ The pyproject.toml dependencies changed. Re-run the install script on Windows:
 
 Same applies for the Linux install: `bash scripts/install-linux.sh`.
 
+### pythonocc-core novtk build lacks XCAF
+
+The conda-forge `novtk` build of pythonocc-core (installed by default on Windows) crashes in C++ when creating XCAF documents (`TDocStd_Document`). The step loader detects this via the conda-meta filename and falls back to the plain `STEPControl_Reader`. This means **no part names, colors, or material hints** from the STEP file on novtk builds — naming rules and manual assignment are the only material-resolution paths.
+
+To get XCAF support, install the non-novtk build (requires VTK): `pythonocc-core=7.9.0` without the `novtk` variant.
+
 ### pythonocc-core is conda-only
 
 `pythonocc-core` is not on PyPI. It can only be installed via conda/micromamba from conda-forge. The `uv` dev environment does NOT have it — OCCT-dependent tests are skipped in the `uv` environment. This is by design (documented in `docs/decisions/phase-0.md`).
@@ -80,6 +86,10 @@ Modules that need OCCT guard imports at call time:
 - `raysim.ui.state` — imports geom modules lazily in methods
 
 Tests use `pytest.importorskip("OCC.Core")` or `pytest.importorskip("PySide6")`.
+
+### Scene build is deferred to run time
+
+Opening a STEP in the GUI only loads the assembly tree and displays shapes in the OCCT viewer. The heavy B1 pipeline (tessellation, healing, watertightness, overlap diagnostic, STL export, Embree BVH build) runs only when the user clicks "Run Simulation". This keeps file-open fast even for large assemblies (250+ solids).
 
 ### PySide6 UI modules use `type: ignore[misc]` for Qt subclasses
 

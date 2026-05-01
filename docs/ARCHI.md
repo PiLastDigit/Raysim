@@ -278,7 +278,7 @@ Phase B1 adds the STEP ingest path. The pipeline produces the same `BuiltScene` 
 
 Key modules:
 
-- **`step_loader`** (B1.1 + B3.0): Reads STEP via `STEPCAFControl_Reader` (migrated from `STEPControl_Reader` in B3.0), walks the XCAF label tree recursively into `LeafSolid` records with synthetic IDs (`solid_NNNN`), path keys, and XCAF attributes (`name`, `color_rgb`, `material_hint`). `AssemblyNode` also carries an optional `name` from XCAF.
+- **`step_loader`** (B1.1 + B3.0): Prefers `STEPCAFControl_Reader` (XCAF — provides `name`, `color_rgb`, `material_hint` on `LeafSolid` and `name` on `AssemblyNode`). Falls back to `STEPControl_Reader` when XCAF is unavailable (the `novtk` conda-forge build crashes in C++ on `TDocStd_Document` creation — detected at startup via the conda-meta filename). The fallback produces the same `solid_NNNN` IDs and bboxes but no XCAF metadata.
 - **`tessellation`** (B1.2): `BRepMesh_IncrementalMesh` per leaf solid. Extracts per-shell triangle arrays in float64 with `loc.Transformation()` applied.
 - **`healing`** (B1.3): `BRepMesh_ModelHealer` pass + shell-orientation normalization. Classifies shells as OUTER or CAVITY via vertex-centroid containment. Per-shell probe rays verify orientation; flips are re-verified with full entry/exit stack-to-zero sequence check.
 - **`watertightness`** (B1.4): Per-shell edge-pairing with vertex canonicalization (1e-9 mm tolerance). Reports unpaired edges, same-orientation edges, degenerate triangles.
