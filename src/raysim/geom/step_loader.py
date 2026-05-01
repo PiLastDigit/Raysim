@@ -41,25 +41,25 @@ class AssemblyNode:
     name: str | None = None
 
 
-_xcaf_available: bool | None = None
+def _xcaf_available() -> bool:
+    """Check whether the XCAF document framework is available.
 
+    The ``novtk`` conda-forge build of pythonocc-core crashes in C++ when
+    importing ``OCC.Core.TDocStd`` — the process dies before Python can
+    catch it. We detect this build variant via the conda-meta filename
+    which contains ``novtk`` in the build string.
+    """
+    import glob
+    import os
+    import sys
 
-def _check_xcaf_available() -> bool:
-    """Probe whether the XCAF reader works without crashing."""
-    global _xcaf_available
-    if _xcaf_available is not None:
-        return _xcaf_available
-    try:
-        from OCC.Core.TCollection import TCollection_ExtendedString
-        from OCC.Core.TDocStd import TDocStd_Document
-        from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
-
-        handle = TDocStd_Document(TCollection_ExtendedString("XDE"))
-        _tool = XCAFDoc_DocumentTool.ShapeTool(handle.Main())
-        _xcaf_available = True
-    except Exception:
-        _xcaf_available = False
-    return _xcaf_available
+    env_root = os.path.dirname(sys.executable)
+    conda_meta = os.path.join(env_root, "conda-meta")
+    for path in glob.glob(os.path.join(conda_meta, "pythonocc-core*.json")):
+        if "novtk" in os.path.basename(path):
+            _LOG.info("step_loader.novtk_build_detected_xcaf_disabled")
+            return False
+    return True
 
 
 def load_step(path: str | Path) -> AssemblyNode:
@@ -75,7 +75,7 @@ def load_step(path: str | Path) -> AssemblyNode:
     if not path.exists():
         raise FileNotFoundError(f"STEP file not found: {path}")
 
-    if _check_xcaf_available():
+    if _xcaf_available():
         try:
             root_node = _load_step_xcaf(path)
         except Exception:
