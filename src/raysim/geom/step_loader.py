@@ -42,19 +42,14 @@ class AssemblyNode:
 
 
 def _xcaf_available() -> bool:
-    """Check whether the XCAF document framework is available.
-
-    pythonocc-core 7.9.0 on Windows crashes in C++ when creating a
-    ``TDocStd_Document`` — both the ``novtk`` and ``all`` builds. The
-    process dies before Python can catch it. We disable XCAF on Windows
-    entirely for this version. Future pythonocc releases may fix this.
-    """
-    import platform
-
-    if platform.system() == "Windows":
-        _LOG.info("step_loader.xcaf_disabled_on_windows")
+    """Check whether the XCAF document framework is available."""
+    try:
+        from OCC.Core.BinXCAFDrivers import binxcafdrivers  # noqa: F401
+        from OCC.Core.TDocStd import TDocStd_Application  # noqa: F401
+        return True
+    except ImportError:
+        _LOG.info("step_loader.xcaf_imports_unavailable")
         return False
-    return True
 
 
 def load_step(path: str | Path) -> AssemblyNode:
@@ -89,14 +84,24 @@ def load_step(path: str | Path) -> AssemblyNode:
 
 
 def _load_step_xcaf(path: Path) -> AssemblyNode:
-    """Load via STEPCAFControl_Reader (XCAF — names, colors, material hints)."""
+    """Load via STEPCAFControl_Reader (XCAF — names, colors, material hints).
+
+    Uses ``TDocStd_Application`` + ``binxcafdrivers.DefineFormat`` instead
+    of the bare ``TDocStd_Document(TCollection_ExtendedString(...))``
+    constructor, which crashes in C++ on pythonocc-core 7.9.x Windows
+    (GitHub issue tpaviot/pythonocc-core#1428).
+    """
+    from OCC.Core.BinXCAFDrivers import binxcafdrivers
     from OCC.Core.IFSelect import IFSelect_RetDone
     from OCC.Core.STEPCAFControl import STEPCAFControl_Reader
-    from OCC.Core.TCollection import TCollection_ExtendedString
-    from OCC.Core.TDocStd import TDocStd_Document
+    from OCC.Core.TDocStd import TDocStd_Application, TDocStd_Document
     from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
 
-    handle = TDocStd_Document(TCollection_ExtendedString("XDE"))
+    app = TDocStd_Application()
+    binxcafdrivers.DefineFormat(app)
+    handle = TDocStd_Document("BinXCAF")
+    app.NewDocument("BinXCAF", handle)
+
     reader = STEPCAFControl_Reader()
     reader.SetColorMode(True)
     reader.SetNameMode(True)

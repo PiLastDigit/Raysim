@@ -23,7 +23,7 @@ $ErrorActionPreference = "Stop"
 # --- Configuration ---
 $EnvName = "raysim-ui"
 $PythonVersion = "3.12"
-$OcctVersion = "7.9.0"
+$OcctVersion = "7.9.3"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $MambaRoot = Join-Path $env:LOCALAPPDATA "raysim-micromamba"
 $MambaExe = Join-Path $ProjectRoot "bin\micromamba.exe"

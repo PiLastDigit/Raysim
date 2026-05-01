@@ -19,7 +19,7 @@ set -euo pipefail
 
 ENV_NAME="raysim-ui"
 PYTHON_VERSION="3.12"
-OCCT_VERSION="7.9.0"
+OCCT_VERSION="7.9.3"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAMBA_ROOT="$PROJECT_ROOT/.micromamba"
 MAMBA_EXE="$PROJECT_ROOT/bin/micromamba"
