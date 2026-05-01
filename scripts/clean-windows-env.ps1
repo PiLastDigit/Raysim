@@ -42,7 +42,12 @@ if (Test-Path $PkgsPath) {
     $size = (Get-ChildItem -Recurse -Force $PkgsPath -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
     $sizeMB = [math]::Round($size / 1MB, 0)
     Write-Host "Removing package cache ($sizeMB MB): $PkgsPath" -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $PkgsPath
+    # Use robocopy empty-dir trick to handle paths exceeding 260 chars (Qt headers)
+    $emptyDir = Join-Path $env:TEMP "raysim_empty_dir"
+    New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
+    robocopy $emptyDir $PkgsPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+    Remove-Item -Recurse -Force $PkgsPath -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force $emptyDir -ErrorAction SilentlyContinue
     $cleaned++
     Write-Host "  Removed" -ForegroundColor Green
 } else {
@@ -54,7 +59,11 @@ if (Test-Path $OldMambaRoot) {
     $size = (Get-ChildItem -Recurse -Force $OldMambaRoot -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
     $sizeMB = [math]::Round($size / 1MB, 0)
     Write-Host "Removing old WSL-created .micromamba ($sizeMB MB): $OldMambaRoot" -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $OldMambaRoot
+    $emptyDir2 = Join-Path $env:TEMP "raysim_empty_dir2"
+    New-Item -ItemType Directory -Path $emptyDir2 -Force | Out-Null
+    robocopy $emptyDir2 $OldMambaRoot /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+    Remove-Item -Recurse -Force $OldMambaRoot -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force $emptyDir2 -ErrorAction SilentlyContinue
     $cleaned++
     Write-Host "  Removed" -ForegroundColor Green
 } else {
