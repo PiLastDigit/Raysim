@@ -101,12 +101,12 @@ if (Test-Path $EnvPath) {
     Write-Host "[2/4] Environment '$EnvName' already exists" -ForegroundColor Green
     Write-Host "  To recreate: delete $EnvPath and re-run this script"
 } else {
-    Write-Host "[2/4] Creating environment '$EnvName' (this downloads ~600 MB)..." -ForegroundColor Yellow
-    Write-Host "  Python $PythonVersion + pythonocc-core $OcctVersion (full/XCAF) + PySide6 + matplotlib"
+    Write-Host "[2/4] Creating environment '$EnvName' (this downloads ~500 MB)..." -ForegroundColor Yellow
+    Write-Host "  Python $PythonVersion + pythonocc-core $OcctVersion + PySide6 + matplotlib"
     Write-Host ""
     & $MambaExe create -n $EnvName `
         "python=$PythonVersion" `
-        "pythonocc-core=$OcctVersion=all_*" `
+        "pythonocc-core=$OcctVersion" `
         pyside6 matplotlib pyqtgraph `
         -c conda-forge -y
     if ($LASTEXITCODE -ne 0) {

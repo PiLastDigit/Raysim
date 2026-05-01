@@ -44,21 +44,16 @@ class AssemblyNode:
 def _xcaf_available() -> bool:
     """Check whether the XCAF document framework is available.
 
-    The ``novtk`` conda-forge build of pythonocc-core crashes in C++ when
-    importing ``OCC.Core.TDocStd`` — the process dies before Python can
-    catch it. We detect this build variant via the conda-meta filename
-    which contains ``novtk`` in the build string.
+    pythonocc-core 7.9.0 on Windows crashes in C++ when creating a
+    ``TDocStd_Document`` — both the ``novtk`` and ``all`` builds. The
+    process dies before Python can catch it. We disable XCAF on Windows
+    entirely for this version. Future pythonocc releases may fix this.
     """
-    import glob
-    import os
-    import sys
+    import platform
 
-    env_root = os.path.dirname(sys.executable)
-    conda_meta = os.path.join(env_root, "conda-meta")
-    for path in glob.glob(os.path.join(conda_meta, "pythonocc-core*.json")):
-        if "novtk" in os.path.basename(path):
-            _LOG.info("step_loader.novtk_build_detected_xcaf_disabled")
-            return False
+    if platform.system() == "Windows":
+        _LOG.info("step_loader.xcaf_disabled_on_windows")
+        return False
     return True
 
 
