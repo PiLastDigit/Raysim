@@ -57,10 +57,11 @@ load_prompt() {
         echo "error: prompt template not found: $tpl" >&2
         return 1
     fi
-    awk -v target="${TARGET-}" -v extra="${EXTRA_PROMPT-}" '
+    awk -v target="${TARGET-}" -v extra="${EXTRA_PROMPT-}" -v notes="${IMPLEMENTER_NOTES-}" '
         {
             gsub(/\{\{TARGET\}\}/, target)
             gsub(/\{\{EXTRA_PROMPT\}\}/, extra)
+            gsub(/\{\{IMPLEMENTER_NOTES\}\}/, notes)
             print
         }
     ' "$tpl"

@@ -78,15 +78,18 @@ export STATE_DIR=".claude/skills/codex-code-review/state"
 
 3. **Address findings** — quote each with `file:line`, read the actual code, fix legitimate ones, push back on incorrect ones. Critical/Major block approval; Minor/Suggestion are case-by-case.
 
-4. **Resume** (re-run tests first, build fresh summary):
+4. **Write implementer notes** (1-3 sentences): which findings you fixed, which you pushed back on and why, any user decisions or environment limitations Codex should stop re-flagging.
+
+5. **Resume** (re-run tests first, build fresh summary):
    ```bash
    bash .claude/skills/codex-plan-review/scripts/resume.sh \
        --prompt-file .claude/skills/codex-code-review/prompts/resume.tpl \
+       --notes "Fixed X. Pushed back on Y because Z." \
        <plan-path> "$TEST_SUMMARY"
    ```
    Loop to step 2.
 
-5. **Cap at 5 rounds** (or user-specified). Surface remaining findings.
+6. **Cap at 5 rounds** (or user-specified). Surface remaining findings.
 
 ### Synthesize
 

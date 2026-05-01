@@ -3,7 +3,7 @@
 # follow-up prompt. The thread id is read from the per-target state
 # file written by start.sh.
 #
-# Usage: resume.sh --prompt-file <tpl> <target> [extra prompt text…]
+# Usage: resume.sh --prompt-file <tpl> [--notes "..."] <target> [extra prompt text…]
 # Exits 0 on success, 1 on Codex failure, 2 if no prior session exists.
 
 set -euo pipefail
@@ -12,12 +12,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/_common.sh"
 
 PROMPT_FILE=""
+IMPLEMENTER_NOTES=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --prompt-file)
             PROMPT_FILE="$2"; shift 2 ;;
         --prompt-file=*)
             PROMPT_FILE="${1#*=}"; shift ;;
+        --notes)
+            IMPLEMENTER_NOTES="$2"; shift 2 ;;
+        --notes=*)
+            IMPLEMENTER_NOTES="${1#*=}"; shift ;;
         --) shift; break ;;
         -*)
             echo "error: unknown flag: $1" >&2; exit 64 ;;
@@ -26,13 +31,13 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$PROMPT_FILE" ] || [ $# -lt 1 ]; then
-    echo "usage: resume.sh --prompt-file <tpl> <target> [extra prompt text…]" >&2
+    echo "usage: resume.sh --prompt-file <tpl> [--notes '...'] <target> [extra prompt text…]" >&2
     exit 64
 fi
 
 TARGET="$1"; shift
 EXTRA_PROMPT="${*:-}"
-export TARGET EXTRA_PROMPT
+export TARGET EXTRA_PROMPT IMPLEMENTER_NOTES
 
 THREAD_FILE="$(thread_file "$TARGET")"
 REVIEW_FILE="$(review_file "$TARGET")"
