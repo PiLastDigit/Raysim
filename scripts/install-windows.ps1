@@ -142,7 +142,9 @@ Write-Host "  Created $CliLauncher"
 
 # GUI launcher (hides console window)
 $GuiLauncher = Join-Path $ProjectRoot "raysim-gui.vbs"
-$vbsContent = "Set WshShell = CreateObject(""WScript.Shell"")`r`nWshShell.Run """"""$PythonExe"""""" -m raysim.cli.main gui"", 0, False`r`n"
+$vbsLine1 = 'Set WshShell = CreateObject("WScript.Shell")'
+$vbsLine2 = 'WshShell.Run """' + $PythonExe + '"" -m raysim.cli.main gui", 0, False'
+$vbsContent = $vbsLine1 + "`r`n" + $vbsLine2 + "`r`n"
 [System.IO.File]::WriteAllText($GuiLauncher, $vbsContent)
 Write-Host "  Created $GuiLauncher (double-click to launch GUI)"
 
