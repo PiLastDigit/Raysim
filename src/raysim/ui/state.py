@@ -243,7 +243,7 @@ class AppState(QObject):  # type: ignore[misc]
         self._leaves = list(iter_leaves(root))
 
         self._run_auto_assignment()
-        self._rebuild_scene()
+        self._scene = None
         self._update_gating()
         self._mark_dirty()
         self.scene_loaded.emit()
@@ -326,7 +326,7 @@ class AppState(QObject):  # type: ignore[misc]
     def set_assignment(self, solid_id: str, group_id: str) -> None:
         self._assignments = [a for a in self._assignments if a.solid_id != solid_id]
         self._assignments.append(MaterialAssignment(solid_id=solid_id, material_group_id=group_id))
-        self._rebuild_scene()
+        self._scene = None
         self._update_gating()
         self._mark_dirty()
         self.assignments_changed.emit()
@@ -341,14 +341,14 @@ class AppState(QObject):  # type: ignore[misc]
                     self._assignments.append(
                         MaterialAssignment(solid_id=s.solid_id, material_group_id=s.material_group_id)
                     )
-        self._rebuild_scene()
+        self._scene = None
         self._update_gating()
         self._mark_dirty()
         self.assignments_changed.emit()
 
     def clear_all_assignments(self) -> None:
         self._assignments = []
-        self._rebuild_scene()
+        self._scene = None
         self._update_gating()
         self._mark_dirty()
         self.assignments_changed.emit()
@@ -399,11 +399,17 @@ class AppState(QObject):  # type: ignore[misc]
     # -- run context ---------------------------------------------------------
 
     def build_run_context(self, output_path: Path | None = None) -> object:
-        """Build a frozen RunContext for RunWorker with pre-computed hashes."""
+        """Build a frozen RunContext for RunWorker with pre-computed hashes.
+
+        Builds the Embree scene on first call (deferred from open_step to
+        avoid blocking the UI with the full B1 pipeline during file open).
+        """
         if self._gating is None or not self._gating.ready:
             raise RuntimeError("Cannot run: material assignments incomplete")
         if self._scene is None:
-            detail = self._last_scene_error or "scene not built"
+            self._rebuild_scene()
+        if self._scene is None:
+            detail = self._last_scene_error or "scene build failed"
             raise RuntimeError(f"Cannot run: {detail}")
         if self._dose_spline is None:
             raise RuntimeError("Cannot run: no dose curve loaded")
