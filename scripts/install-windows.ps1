@@ -131,22 +131,16 @@ Write-Host "  raysim installed" -ForegroundColor Green
 # --- Step 4: Create launcher scripts ---
 Write-Host "[4/4] Creating launcher scripts..." -ForegroundColor Yellow
 
-# Command-line launcher
+# Command-line launcher (must use CRLF for CMD to parse it)
 $CliLauncher = Join-Path $ProjectRoot "raysim.cmd"
-@"
-@echo off
-set MAMBA_ROOT_PREFIX=$MambaRoot
-"$MambaExe" run -n $EnvName raysim %*
-"@ | Set-Content -Path $CliLauncher -Encoding ASCII
+$cmdContent = "@echo off`r`nset MAMBA_ROOT_PREFIX=$MambaRoot`r`n""$MambaExe"" run -n $EnvName raysim %*`r`n"
+[System.IO.File]::WriteAllText($CliLauncher, $cmdContent)
 Write-Host "  Created $CliLauncher"
 
 # GUI launcher (hides console window)
 $GuiLauncher = Join-Path $ProjectRoot "raysim-gui.vbs"
-@"
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.Environment("Process")("MAMBA_ROOT_PREFIX") = "$MambaRoot"
-WshShell.Run """$MambaExe"" run -n $EnvName raysim gui", 0, False
-"@ | Set-Content -Path $GuiLauncher -Encoding ASCII
+$vbsContent = "Set WshShell = CreateObject(""WScript.Shell"")`r`nWshShell.Environment(""Process"")(""MAMBA_ROOT_PREFIX"") = ""$MambaRoot""`r`nWshShell.Run """"""$MambaExe"""""" run -n $EnvName raysim gui"", 0, False`r`n"
+[System.IO.File]::WriteAllText($GuiLauncher, $vbsContent)
 Write-Host "  Created $GuiLauncher (double-click to launch GUI)"
 
 # Desktop shortcut
