@@ -5,7 +5,7 @@ Wraps pythonocc-core's qtViewer3d for embedding in the PySide6 main window.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from PySide6.QtCore import Signal
@@ -29,17 +29,23 @@ class ViewerWidget(QWidget):  # type: ignore[misc]
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
 
-        from OCC.Display.qtDisplay import qtViewer3d
-
-        self._viewer = qtViewer3d(self)
-        self._layout.addWidget(self._viewer)
-
+        self._viewer: Any = None
+        self._display: Any = None
         self._solid_shapes: dict[str, object] = {}
         self._solid_ais: dict[str, object] = {}
         self._snap_mode: str = "centroid"
 
     def init_viewer(self) -> None:
-        """Initialize the viewer display after the widget is shown."""
+        """Create the OCCT viewer and initialize OpenGL (call after show)."""
+        if self._viewer is not None:
+            return
+
+        from OCC.Display.backend import load_backend
+        load_backend("pyside6")
+        from OCC.Display.qtDisplay import qtViewer3d
+
+        self._viewer = qtViewer3d(self)
+        self._layout.addWidget(self._viewer)
         self._viewer.InitDriver()
         self._display = self._viewer._display
         self._setup_selection_callback()
@@ -112,12 +118,14 @@ class ViewerWidget(QWidget):  # type: ignore[misc]
         self.fit_all()
 
     def clear(self) -> None:
-        self._display.EraseAll()
+        if self._display is not None:
+            self._display.EraseAll()
         self._solid_shapes.clear()
         self._solid_ais.clear()
 
     def fit_all(self) -> None:
-        self._display.FitAll()
+        if self._display is not None:
+            self._display.FitAll()
 
     def set_view_axis(self, axis: str) -> None:
         """Set camera to a named axis view."""

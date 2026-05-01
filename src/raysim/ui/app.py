@@ -207,8 +207,10 @@ class MainWindow(QMainWindow):  # type: ignore[misc]
 
 def launch() -> None:
     """Entry point for ``raysim gui``."""
+    from PySide6.QtCore import QTimer
+
     app = QApplication.instance() or QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    window._viewer.init_viewer()
+    QTimer.singleShot(0, window._viewer.init_viewer)
     sys.exit(app.exec())
