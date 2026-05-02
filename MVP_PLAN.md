@@ -338,7 +338,7 @@ No code lands on `main` except infra and decided spikes.
 
 ### MVP release (Stages A + B1 + B2 + B3 + B4 + B5)
 *The full reviewable release — what "MVP" means in this doc.*
-1. Imports the three benchmark assemblies; every solid watertight and material-assigned, with overlap/interference diagnostic clean (or accepted in the project file).
+1. Imports the three benchmark assemblies; every solid watertight and material-assigned, with mismatched-contact gate clean. Full overlap/interference diagnostic (on-demand via `raysim validate` or UI "Validate Geometry") clean or accepted in the project file.
 2. Produces per-detector TID for a standard imported `.dos` scenario inside the product-benchmark performance target (≤ 90 s on 16 cores for the full real assembly with 100 detectors at Nside=64).
 3. Matches analytic path-length tests to relative error ≤ 1e-5 (or documented relaxation); spline reproduces the imported DDC to ≤1% relative against source rows.
 4. Bundle handed off-machine reproduces a bit-identical `run.json` on the same build SHA and pinned library versions (PDF and dashboard artifacts may differ by timestamp/layout but render identical numerics).
