@@ -22,7 +22,7 @@ dose curve (.dos) ──► log-cubic spline ──────────┘
 
 ## Project status
 
-**v0.3.1** -- Phases A through B3 complete.
+**v0.4.0** -- Phases A through B3 complete.
 
 | Phase | Status | What it delivers |
 |-------|--------|-----------------|

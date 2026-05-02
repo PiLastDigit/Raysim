@@ -243,6 +243,8 @@ raysim run [OPTIONS]      # the Stage A driver
 
 `raysim gui` (B3) launches the PySide6 desktop application. Requires the `[ui]` extra. Fails gracefully with a clear error if PySide6 is missing.
 
+`raysim validate <STEP>` (v0.4.0) runs the full overlap/interference diagnostic on a STEP file. Exits `0` if clean, `1` if interference or boolean failures detected. `--accept-warnings` downgrades warnings (not boolean failures) to exit `0`. `--json-out` writes the full report as JSON.
+
 I/O conventions:
 
 - **stdout** is reserved for the post-completion confirmation (`wrote /path/to/run.json`).
@@ -274,7 +276,9 @@ The `load_scene` function accepts an optional `tied_groups: PreBuiltTiedGroups` 
 
 Phase B1 adds the STEP ingest path. The pipeline produces the same `BuiltScene` the Stage A engine consumes, via an STL-export-then-load adapter:
 
-`load_step` → `tessellate` (per leaf) → `heal_assembly` → `validate_watertightness` → `diagnose_overlaps` → `export_assembly_to_stl` → `load_scene_from_directory(tied_groups=...)`
+`load_step` → `tessellate` (per leaf) → `heal_assembly` → `validate_watertightness` → `extract_contacts` → `export_assembly_to_stl` → `load_scene_from_directory(tied_groups=...)`
+
+The full volume-based overlap diagnostic (`diagnose_overlaps`) is on-demand: accessible via the UI's "Validate Geometry" button (runs in a `ValidateWorker` QThread) or the `raysim validate` CLI subcommand. The mandatory pipeline uses only `extract_contacts` (fast triangle-match tied pairing + mismatched-contact detection, no OCCT volume classification).
 
 Key modules:
 
@@ -282,8 +286,8 @@ Key modules:
 - **`tessellation`** (B1.2): `BRepMesh_IncrementalMesh` per leaf solid. Extracts per-shell triangle arrays in float64 with `loc.Transformation()` applied.
 - **`healing`** (B1.3): `BRepMesh_ModelHealer` pass + shell-orientation normalization. Classifies shells as OUTER or CAVITY via vertex-centroid containment. Per-shell probe rays verify orientation; flips are re-verified with full entry/exit stack-to-zero sequence check.
 - **`watertightness`** (B1.4): Per-shell edge-pairing with vertex canonicalization (1e-9 mm tolerance). Reports unpaired edges, same-orientation edges, degenerate triangles.
-- **`overlap`** (B1.5): Triangle-level vertex-match tied pairing + four-way solid-pair classification (`contact_only` / `accepted_nested` / `interference_warning` / `interference_fail`). B1 scope: topology-shared contacts only. Mismatched-tessellation contacts detected and gated via `MismatchedContactRegion` warnings.
-- **`adapter`** (B1.6): Deterministic binary-STL writer (lex-sorted, 6-decimal rounding), translates tied groups through export index maps into `PreBuiltTiedGroups`. Three-flag override scheme for validation gates: `accept_warnings`, `accept_interference_fail`, `accept_watertightness_failures`. Overrides recorded on `ValidatedAssembly.overrides_used`.
+- **`overlap`** (B1.5 + v0.4.0): Two-tier design. `extract_contacts()` (fast path, mandatory): AABB filter + triangle-level vertex-match tied pairing, returns `ContactReport` with `tied_pairs` + `mismatched_contacts`. `diagnose_overlaps()` (full path, on-demand): adds O(N²) OCCT volume-intersection classification with four-way status (`contact_only` / `accepted_nested` / `interference_warning` / `interference_fail`). B1 scope: topology-shared contacts only. Mismatched-tessellation contacts detected and gated via `MismatchedContactRegion` warnings.
+- **`adapter`** (B1.6 + v0.4.0): Deterministic binary-STL writer (lex-sorted, 6-decimal rounding), translates tied groups from `ContactReport.tied_pairs` through export index maps into `PreBuiltTiedGroups`. Split validation gates: mismatched-contact gate (always active) + interference gate (only when `overlaps` is populated from on-demand validation). Three-flag override scheme: `accept_warnings`, `accept_interference_fail`, `accept_watertightness_failures`. Overrides recorded on `ValidatedAssembly.overrides_used`.
 
 All modules guard OCC imports at call time. `pytest.importorskip("OCC.Core")` skips B1 tests without pythonocc-core.
 

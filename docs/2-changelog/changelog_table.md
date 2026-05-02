@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message |
 | ------- | ---- | -------------- |
+| `0.4.0` | 1    | Decouple overlap diagnostic from pipeline, add on-demand validation |
 | `0.3.1` | 1    | Fix XCAF name extraction, add instance/prototype name columns to assembly tree |
 | `0.3.0` | 1    | Add Phase B3 UI + authoring: XCAF migration, PySide6 app, panels, overlays, run dispatch |
 | `0.2.0` | 1    | Add Phase B2 materials + project file: library, rules, STEP tags, review, gating, .raysim format |
@@ -11,6 +12,12 @@
 ---
 
 # Changelog Summary
+
+- **v0.4.0 (Decouple Overlap Diagnostic — Week 1, 02-05-2026)**:
+  Removed the slow O(N²) volume-intersection classification from the
+  mandatory pipeline. Fast `extract_contacts()` stays inline; full
+  `diagnose_overlaps` is on-demand via "Validate Geometry" button or
+  `raysim validate` CLI. Validation runs off the GUI thread.
 
 - **v0.3.1 (XCAF Name Fix — Week 1, 01-05-2026)**:
   Fixed broken XCAF label name extraction (`GetLabelName()` replaces

@@ -44,6 +44,58 @@ main.add_command(run_cmd)
 
 
 @main.command()
+@click.argument("step_path", type=click.Path(exists=True))
+@click.option("--accept-warnings", is_flag=True, help="Downgrade warnings to exit 0.")
+@click.option("--json-out", type=click.Path(), default=None, help="Write full report as JSON.")
+def validate(step_path: str, accept_warnings: bool, json_out: str | None) -> None:
+    """Run the full overlap/interference diagnostic on a STEP file."""
+    import json
+
+    from raysim.geom.healing import heal_assembly
+    from raysim.geom.overlap import OverlapStatus, diagnose_overlaps
+    from raysim.geom.step_loader import iter_leaves, load_step
+    from raysim.geom.tessellation import tessellate
+
+    root = load_step(step_path)
+    leaves = list(iter_leaves(root))
+
+    tessellated = [tessellate(leaf) for leaf in leaves]
+    healed = heal_assembly(tessellated)
+
+    shape_map = {leaf.solid_id: leaf.shape for leaf in leaves}
+    report = diagnose_overlaps(healed, shapes=shape_map)
+
+    n_contact = sum(1 for p in report.pairs if p.status == OverlapStatus.CONTACT_ONLY)
+    n_nested = sum(1 for p in report.pairs if p.status == OverlapStatus.ACCEPTED_NESTED)
+    n_warn = len(report.warnings())
+    n_fail = len(report.failed())
+    n_mismatch = len(report.mismatched_contacts)
+
+    click.echo(f"Pairs: {len(report.pairs)} total")
+    click.echo(f"  contact_only: {n_contact}")
+    click.echo(f"  accepted_nested: {n_nested}")
+    click.echo(f"  interference_warning: {n_warn}")
+    click.echo(f"  interference_fail: {n_fail}")
+    click.echo(f"Mismatched contacts: {n_mismatch}")
+    click.echo(f"Boolean failures: {len(report.boolean_failures)}")
+
+    if json_out is not None:
+        import dataclasses
+        from pathlib import Path
+
+        Path(json_out).write_text(
+            json.dumps(dataclasses.asdict(report), indent=2, default=str),
+            encoding="utf-8",
+        )
+        click.echo(f"Report written to {json_out}")
+
+    n_bool_fail = len(report.boolean_failures)
+    has_issues = n_fail > 0 or n_bool_fail > 0 or (n_warn > 0 and not accept_warnings)
+    if has_issues:
+        raise SystemExit(1)
+
+
+@main.command()
 def gui() -> None:
     """Launch the RaySim desktop application."""
     try:

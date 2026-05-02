@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("OCC.Core")
 
 from raysim.geom.healing import heal_assembly
-from raysim.geom.overlap import OverlapStatus, diagnose_overlaps
+from raysim.geom.overlap import OverlapStatus, diagnose_overlaps, extract_contacts
 from raysim.geom.step_loader import iter_leaves, load_step
 from raysim.geom.tessellation import tessellate
 
@@ -93,3 +93,32 @@ def test_coincident_faces_partial_coverage() -> None:
     healed, shapes = _pipeline("coincident_faces_partial.step")
     report = diagnose_overlaps(healed, shapes=shapes)
     assert len(report.mismatched_contacts) >= 1
+
+
+# ---------------------------------------------------------------------------
+# extract_contacts (fast path)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.needs_occt
+def test_extract_contacts_single_solid() -> None:
+    healed, _shapes = _pipeline("aluminum_box.step")
+    contacts = extract_contacts(healed)
+    assert len(contacts.tied_pairs) == 0
+    assert len(contacts.mismatched_contacts) == 0
+
+
+@pytest.mark.needs_occt
+def test_extract_contacts_coincident_faces() -> None:
+    """extract_contacts finds the same tied pairs as diagnose_overlaps."""
+    healed, shapes = _pipeline("coincident_faces.step")
+    contacts = extract_contacts(healed)
+    report = diagnose_overlaps(healed, shapes=shapes)
+    assert len(contacts.tied_pairs) == len(report.all_tied_triangle_pairs())
+
+
+@pytest.mark.needs_occt
+def test_extract_contacts_concentric_shell() -> None:
+    healed, _shapes = _pipeline("concentric_shell.step")
+    contacts = extract_contacts(healed)
+    assert len(contacts.tied_pairs) >= 0

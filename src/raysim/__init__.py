@@ -1,3 +1,3 @@
 """RaySim — 3D TID sector-shielding simulator."""
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"

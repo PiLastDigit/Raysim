@@ -88,6 +88,19 @@ class BooleanFailure:
 
 
 @dataclass(frozen=True)
+class ContactReport:
+    """Fast contact extraction result — tied pairs + mismatched contacts.
+
+    Produced by ``extract_contacts()`` (no OCCT volume classification).
+    The ray engine needs tied pairs (ARCHI §11) and mismatched contacts
+    must still gate/warn (ARCHI §9b).
+    """
+
+    tied_pairs: tuple[TiedTrianglePair, ...]
+    mismatched_contacts: tuple[MismatchedContactRegion, ...]
+
+
+@dataclass(frozen=True)
 class OverlapReport:
     """Full overlap diagnostic for an assembly."""
 
@@ -106,6 +119,60 @@ class OverlapReport:
         for p in self.pairs:
             result.extend(p.tied_triangle_pairs)
         return tuple(result)
+
+
+def extract_contacts(
+    solids: Sequence[HealedSolid],
+    *,
+    coplanar_normal_tol_rad: float = COPLANAR_NORMAL_TOL_RAD,
+    coplanar_plane_tol_relative: float = COPLANAR_PLANE_TOL_REL,
+    vertex_match_tol_relative: float = VERTEX_MATCH_TOL_REL,
+    coverage_epsilon: float = COVERAGE_EPSILON,
+) -> ContactReport:
+    """Fast contact extraction: AABB filter + triangle-match tied pairing.
+
+    No OCCT volume classification.  Returns tied pairs needed by the ray
+    engine and mismatched-contact warnings for the pipeline gate.
+    """
+    if len(solids) < 2:
+        return ContactReport(tied_pairs=(), mismatched_contacts=())
+
+    bbox_diag = _compute_assembly_bbox_diag(solids)
+    plane_tol = coplanar_plane_tol_relative * bbox_diag
+    vtx_tol = vertex_match_tol_relative * bbox_diag
+
+    all_tied: list[TiedTrianglePair] = []
+    all_mismatched: list[MismatchedContactRegion] = []
+
+    sorted_solids = sorted(solids, key=lambda s: s.solid_id)
+
+    for i in range(len(sorted_solids)):
+        for j in range(i + 1, len(sorted_solids)):
+            sa = sorted_solids[i]
+            sb = sorted_solids[j]
+
+            if not _aabb_overlap(sa, sb):
+                continue
+
+            tied_pairs, mcr_list = _detect_coplanar_contacts(
+                sa, sb,
+                coplanar_normal_tol_rad=coplanar_normal_tol_rad,
+                plane_tol_mm=plane_tol,
+                vtx_tol_mm=vtx_tol,
+                coverage_epsilon=coverage_epsilon,
+            )
+            all_tied.extend(tied_pairs)
+            all_mismatched.extend(mcr_list)
+
+    _LOG.info(
+        "overlap.contacts_extracted",
+        n_tied=len(all_tied),
+        n_mismatched=len(all_mismatched),
+    )
+    return ContactReport(
+        tied_pairs=tuple(all_tied),
+        mismatched_contacts=tuple(all_mismatched),
+    )
 
 
 def diagnose_overlaps(

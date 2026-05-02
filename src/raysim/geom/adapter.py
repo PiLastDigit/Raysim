@@ -18,7 +18,7 @@ import structlog
 from numpy.typing import NDArray
 
 from raysim.geom.healing import HealedSolid
-from raysim.geom.overlap import OverlapReport, TiedTrianglePair
+from raysim.geom.overlap import ContactReport, OverlapReport, TiedTrianglePair
 from raysim.geom.pipeline import ValidatedAssembly, ValidationOverrides, build_assembly_from_step
 from raysim.geom.watertightness import WatertightnessReport
 from raysim.proj.schema import Material, MaterialAssignment
@@ -58,7 +58,9 @@ def build_scene_from_step(
 
     # Apply validation gates.
     _gate_watertightness(assembly.watertightness, accept_watertightness_failures)
-    _gate_overlaps(assembly.overlaps, accept_warnings, accept_interference_fail)
+    _gate_mismatched_contacts(assembly.contacts, accept_warnings)
+    if assembly.overlaps is not None:
+        _gate_interference(assembly.overlaps, accept_warnings, accept_interference_fail)
 
     overrides = ValidationOverrides(
         accept_warnings=accept_warnings,
@@ -72,9 +74,9 @@ def build_scene_from_step(
         tmp_path = Path(tmpdir)
         exported = export_assembly_to_stl(assembly, tmp_path)
 
-        # Build tied groups from STEP-derived pairs.
+        # Build tied groups from fast-path contact extraction.
         tied = _build_tied_groups(
-            assembly.overlaps.all_tied_triangle_pairs(),
+            assembly.contacts.tied_pairs,
             exported,
             assembly.solids,
         )
@@ -139,7 +141,19 @@ def _gate_watertightness(
         )
 
 
-def _gate_overlaps(
+def _gate_mismatched_contacts(
+    contacts: ContactReport,
+    accept_warnings: bool,
+) -> None:
+    if contacts.mismatched_contacts and not accept_warnings:
+        n = len(contacts.mismatched_contacts)
+        raise GeomValidationError(
+            f"{n} mismatched contact region(s) detected. "
+            "Pass accept_warnings=True to override."
+        )
+
+
+def _gate_interference(
     report: OverlapReport,
     accept_warnings: bool,
     accept_interference_fail: bool,
@@ -153,15 +167,12 @@ def _gate_overlaps(
         )
 
     warnings = report.warnings()
-    mismatched = report.mismatched_contacts
     bool_failures = report.boolean_failures
 
-    if (warnings or mismatched or bool_failures) and not accept_warnings:
+    if (warnings or bool_failures) and not accept_warnings:
         parts: list[str] = []
         if warnings:
             parts.append(f"{len(warnings)} interference warnings")
-        if mismatched:
-            parts.append(f"{len(mismatched)} mismatched contact regions")
         if bool_failures:
             parts.append(f"{len(bool_failures)} boolean failures")
         raise GeomValidationError(

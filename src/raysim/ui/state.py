@@ -33,6 +33,7 @@ from raysim.proj.project import (
 from raysim.proj.schema import Detector, MaterialAssignment
 
 if TYPE_CHECKING:
+    from raysim.geom.overlap import OverlapReport
     from raysim.geom.step_loader import AssemblyNode, LeafSolid
     from raysim.ray.scene import BuiltScene
 
@@ -88,6 +89,8 @@ class AppState(QObject):  # type: ignore[misc]
 
         self._detector_results: list[object] = []
         self._last_scene_error: str | None = None
+        self._overlap_report: OverlapReport | None = None
+        self._geometry_revision: int = 0
 
     # -- properties ----------------------------------------------------------
 
@@ -146,6 +149,29 @@ class AppState(QObject):  # type: ignore[misc]
     @property
     def detector_results(self) -> list[object]:
         return list(self._detector_results)
+
+    @property
+    def geometry_revision(self) -> int:
+        return self._geometry_revision
+
+    @property
+    def overlap_validated(self) -> bool:
+        return self._overlap_report is not None
+
+    def set_overlap_report(self, report: OverlapReport) -> None:
+        self._overlap_report = report
+
+    def _overlap_summary(self) -> dict[str, int] | None:
+        r = self._overlap_report
+        if r is None:
+            return None
+        from raysim.geom.overlap import OverlapStatus
+        return {
+            "n_contact": sum(1 for p in r.pairs if p.status == OverlapStatus.CONTACT_ONLY),
+            "n_nested": sum(1 for p in r.pairs if p.status == OverlapStatus.ACCEPTED_NESTED),
+            "n_warning": len(r.warnings()),
+            "n_fail": len(r.failed()),
+        }
 
     @property
     def step_path(self) -> Path | None:
@@ -244,6 +270,8 @@ class AppState(QObject):  # type: ignore[misc]
 
         self._run_auto_assignment()
         self._scene = None
+        self._overlap_report = None
+        self._geometry_revision += 1
         self._update_gating()
         self._mark_dirty()
         self.scene_loaded.emit()
@@ -282,6 +310,20 @@ class AppState(QObject):  # type: ignore[misc]
     def reload_step(self) -> None:
         if self._step_path is not None:
             self.open_step(self._step_path)
+
+    def validate_geometry(self) -> OverlapReport | None:
+        """Run the full overlap/interference diagnostic on demand."""
+        if self._step_path is None or not self._leaves:
+            return None
+
+        from raysim.geom.healing import heal_assembly
+        from raysim.geom.overlap import diagnose_overlaps
+        from raysim.geom.tessellation import tessellate
+
+        tessellated = [tessellate(leaf) for leaf in self._leaves]
+        healed = heal_assembly(tessellated)
+        shape_map = {leaf.solid_id: leaf.shape for leaf in self._leaves}
+        return diagnose_overlaps(healed, shapes=shape_map)
 
     # -- material assignment -------------------------------------------------
 
@@ -435,6 +477,8 @@ class AppState(QObject):  # type: ignore[misc]
             assignments_hash=assign_hash,
             detectors_hash=det_hash,
             dose_curve_hash=dose_hash,
+            overlap_validated=self.overlap_validated,
+            overlap_summary=self._overlap_summary(),
         )
 
     # -- gating --------------------------------------------------------------
