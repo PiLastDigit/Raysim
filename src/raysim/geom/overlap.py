@@ -145,24 +145,23 @@ def extract_contacts(
     all_mismatched: list[MismatchedContactRegion] = []
 
     sorted_solids = sorted(solids, key=lambda s: s.solid_id)
+    candidate_pairs = _spatial_hash_pairs(sorted_solids)
 
-    for i in range(len(sorted_solids)):
-        for j in range(i + 1, len(sorted_solids)):
-            sa = sorted_solids[i]
-            sb = sorted_solids[j]
+    _LOG.info("overlap.contact_candidates", n_total=len(sorted_solids), n_pairs=len(candidate_pairs))
 
-            if not _aabb_overlap(sa, sb):
-                continue
+    for sa, sb in candidate_pairs:
+        if not _aabb_overlap(sa, sb):
+            continue
 
-            tied_pairs, mcr_list = _detect_coplanar_contacts(
-                sa, sb,
-                coplanar_normal_tol_rad=coplanar_normal_tol_rad,
-                plane_tol_mm=plane_tol,
-                vtx_tol_mm=vtx_tol,
-                coverage_epsilon=coverage_epsilon,
-            )
-            all_tied.extend(tied_pairs)
-            all_mismatched.extend(mcr_list)
+        tied_pairs, mcr_list = _detect_coplanar_contacts(
+            sa, sb,
+            coplanar_normal_tol_rad=coplanar_normal_tol_rad,
+            plane_tol_mm=plane_tol,
+            vtx_tol_mm=vtx_tol,
+            coverage_epsilon=coverage_epsilon,
+        )
+        all_tied.extend(tied_pairs)
+        all_mismatched.extend(mcr_list)
 
     _LOG.info(
         "overlap.contacts_extracted",
@@ -208,45 +207,57 @@ def diagnose_overlaps(
     bool_failures: list[BooleanFailure] = []
 
     sorted_solids = sorted(solids, key=lambda s: s.solid_id)
+    candidate_pairs = _spatial_hash_pairs(sorted_solids)
 
-    for i in range(len(sorted_solids)):
-        for j in range(i + 1, len(sorted_solids)):
-            sa = sorted_solids[i]
-            sb = sorted_solids[j]
+    _LOG.info("overlap.diagnose_candidates", n_total=len(sorted_solids), n_pairs=len(candidate_pairs))
 
-            if not _aabb_overlap(sa, sb):
-                continue
+    for sa, sb in candidate_pairs:
+        if not _aabb_overlap(sa, sb):
+            continue
 
-            tied_pairs, mcr_list = _detect_coplanar_contacts(
-                sa, sb,
-                coplanar_normal_tol_rad=coplanar_normal_tol_rad,
-                plane_tol_mm=plane_tol,
-                vtx_tol_mm=vtx_tol,
-                coverage_epsilon=coverage_epsilon,
-            )
-            mismatched.extend(mcr_list)
+        tied_pairs, mcr_list = _detect_coplanar_contacts(
+            sa, sb,
+            coplanar_normal_tol_rad=coplanar_normal_tol_rad,
+            plane_tol_mm=plane_tol,
+            vtx_tol_mm=vtx_tol,
+            coverage_epsilon=coverage_epsilon,
+        )
+        mismatched.extend(mcr_list)
 
-            # Volume classification.
-            vol_result = _classify_pair(
-                sa, sb,
-                shapes=shapes,
-                small_volume_threshold_mm3=small_volume_threshold_mm3,
-                small_relative_volume=small_relative_volume,
-                bool_failures_out=bool_failures,
-            )
+        # Early-exit: if contacts fully explain the AABB overlap
+        # (tied pairs exist, no mismatches) and the AABBs don't
+        # overlap with negative margin, skip the expensive OCCT
+        # volume classification.
+        if tied_pairs and not mcr_list and not _aabb_overlap_margin(sa, sb, margin_mm=-0.01):
+            pairs.append(OverlapPair(
+                solid_a=sa.solid_id,
+                solid_b=sb.solid_id,
+                status=OverlapStatus.CONTACT_ONLY,
+                intersection_volume_mm3=0.0,
+                bias_estimate_g_per_cm2=0.0,
+                tied_triangle_pairs=tuple(tied_pairs),
+            ))
+            continue
 
-            # Boolean failures are recorded in bool_failures only —
-            # no OverlapPair because status is undetermined.
-            if vol_result is not None:
-                status, int_vol, bias = vol_result
-                pairs.append(OverlapPair(
-                    solid_a=sa.solid_id,
-                    solid_b=sb.solid_id,
-                    status=status,
-                    intersection_volume_mm3=int_vol,
-                    bias_estimate_g_per_cm2=bias,
-                    tied_triangle_pairs=tuple(tied_pairs),
-                ))
+        # Volume classification.
+        vol_result = _classify_pair(
+            sa, sb,
+            shapes=shapes,
+            small_volume_threshold_mm3=small_volume_threshold_mm3,
+            small_relative_volume=small_relative_volume,
+            bool_failures_out=bool_failures,
+        )
+
+        if vol_result is not None:
+            status, int_vol, bias = vol_result
+            pairs.append(OverlapPair(
+                solid_a=sa.solid_id,
+                solid_b=sb.solid_id,
+                status=status,
+                intersection_volume_mm3=int_vol,
+                bias_estimate_g_per_cm2=bias,
+                tied_triangle_pairs=tuple(tied_pairs),
+            ))
 
     _LOG.info(
         "overlap.diagnosed",
@@ -279,6 +290,78 @@ def _aabb_overlap(a: HealedSolid, b: HealedSolid) -> bool:
         if a.bbox_max_mm[i] < b.bbox_min_mm[i] or b.bbox_max_mm[i] < a.bbox_min_mm[i]:
             return False
     return True
+
+
+def _aabb_overlap_margin(a: HealedSolid, b: HealedSolid, *, margin_mm: float) -> bool:
+    """AABB overlap test with a margin (negative = shrink, positive = expand)."""
+    for i in range(3):
+        if (a.bbox_max_mm[i] + margin_mm) < (b.bbox_min_mm[i] - margin_mm):
+            return False
+        if (b.bbox_max_mm[i] + margin_mm) < (a.bbox_min_mm[i] - margin_mm):
+            return False
+    return True
+
+
+def _spatial_hash_pairs(
+    solids: Sequence[HealedSolid],
+) -> list[tuple[HealedSolid, HealedSolid]]:
+    """Return candidate pairs using a grid-based spatial hash.
+
+    Cell size = ``2 × median(solid_bbox_diag)``.  Only pairs sharing at
+    least one grid cell are returned, with canonical ordering
+    (``solid_a.solid_id < solid_b.solid_id``) for deduplication.
+    """
+    if len(solids) < 2:
+        return []
+
+    diags = [
+        float(np.linalg.norm(
+            np.array(s.bbox_max_mm) - np.array(s.bbox_min_mm),
+        ))
+        for s in solids
+    ]
+    cell_size = float(np.median(diags)) * 2.0
+    if cell_size < 1e-9:
+        cell_size = 1.0
+
+    inv_cell = 1.0 / cell_size
+
+    max_cells_per_solid = 512
+    grid: dict[tuple[int, int, int], list[int]] = defaultdict(list)
+    oversized: list[int] = []
+
+    for idx, s in enumerate(solids):
+        lo = tuple(int(np.floor(v * inv_cell)) for v in s.bbox_min_mm)
+        hi = tuple(int(np.floor(v * inv_cell)) for v in s.bbox_max_mm)
+        n_cells = (hi[0] - lo[0] + 1) * (hi[1] - lo[1] + 1) * (hi[2] - lo[2] + 1)
+        if n_cells > max_cells_per_solid:
+            oversized.append(idx)
+            continue
+        for ix in range(lo[0], hi[0] + 1):
+            for iy in range(lo[1], hi[1] + 1):
+                for iz in range(lo[2], hi[2] + 1):
+                    grid[(ix, iy, iz)].append(idx)
+
+    seen: set[tuple[str, str]] = set()
+    result: list[tuple[HealedSolid, HealedSolid]] = []
+
+    def _add_pair(a: HealedSolid, b: HealedSolid) -> None:
+        key = (a.solid_id, b.solid_id) if a.solid_id < b.solid_id else (b.solid_id, a.solid_id)
+        if key not in seen:
+            seen.add(key)
+            result.append((a, b) if a.solid_id < b.solid_id else (b, a))
+
+    for cell_members in grid.values():
+        for ai in range(len(cell_members)):
+            for bi in range(ai + 1, len(cell_members)):
+                _add_pair(solids[cell_members[ai]], solids[cell_members[bi]])
+
+    for oi in oversized:
+        for idx in range(len(solids)):
+            if idx != oi:
+                _add_pair(solids[oi], solids[idx])
+
+    return result
 
 
 def _get_flat_arrays(
