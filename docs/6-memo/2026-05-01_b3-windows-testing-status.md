@@ -103,7 +103,7 @@ UI testing on Windows.
 ## Next steps
 
 1. ~~Fix XCAF label name extraction (issue 1 above)~~ — **Fixed in v0.3.1**: `GetLabelName()` + instance/prototype separation
-2. Fix Mesa/viewport rendering (issue 2 above)
+2. ~~Fix Mesa/viewport rendering (issue 2 above)~~ — **Fixed**: renamed Mesa `opengl32.dll`, added deferred viewport resize, applied assembly placement transforms via accumulated `TopLoc_Location`
 3. Once both fixed: test full flow (open STEP → assign materials → place detectors → load .dos → run → view results)
 4. Push and verify CI
 5. Implement the v0.4.0 overlap decoupling plan (`docs/1-plans/F_0.4.0_decouple-overlap-diagnostic.plan.md`)

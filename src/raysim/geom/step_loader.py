@@ -251,6 +251,7 @@ def _walk_label(
     _prefix: str,
     _counter: list[int],
     _instance_name: str | None = None,
+    _accumulated_loc: object | None = None,
 ) -> AssemblyNode:
     """Recursively walk one XCAF label into an AssemblyNode.
 
@@ -258,6 +259,10 @@ def _walk_label(
     passed by the parent when following a reference.  The label's own name
     (e.g. "R_0402_1005Metric") is the prototype/part-definition name.
     Instance name takes priority for display; prototype becomes ``part_name``.
+
+    ``_accumulated_loc`` carries the composed ``TopLoc_Location`` from all
+    ancestor component references so leaf shapes are placed correctly in
+    the assembly.
     """
     from OCC.Core.TDF import TDF_LabelSequence
     from OCC.Core.TopAbs import TopAbs_COMPOUND, TopAbs_COMPSOLID, TopAbs_SOLID
@@ -274,8 +279,13 @@ def _walk_label(
             comp_label = components.Value(i + 1)
             ref_label = comp_label
             comp_name: str | None = None
+            child_loc = _accumulated_loc
             if shape_tool.IsReference(comp_label):  # type: ignore[attr-defined]
                 comp_name = _get_label_name(comp_label)
+                child_loc = _compose_location(
+                    _accumulated_loc,
+                    shape_tool.GetLocation(comp_label),  # type: ignore[attr-defined]
+                )
                 from OCC.Core.TDF import TDF_Label
                 ref = TDF_Label()
                 shape_tool.GetReferredShape(comp_label, ref)  # type: ignore[attr-defined]
@@ -286,6 +296,7 @@ def _walk_label(
                     ref_label, shape_tool, color_tool, mat_tool,
                     _prefix=child_prefix, _counter=_counter,
                     _instance_name=comp_name,
+                    _accumulated_loc=child_loc,
                 )
             )
         return AssemblyNode(
@@ -296,7 +307,8 @@ def _walk_label(
     if shape_tool.IsSimpleShape(label):  # type: ignore[attr-defined]
         shape = shape_tool.GetShape(label)  # type: ignore[attr-defined]
         if shape is not None:
-            shape_type = shape.ShapeType()
+            shape = _apply_location(shape, _accumulated_loc)
+            shape_type = shape.ShapeType()  # type: ignore[attr-defined]
             if shape_type == TopAbs_SOLID:
                 return _make_leaf_node(
                     shape, label, shape_tool, color_tool, mat_tool,
@@ -422,6 +434,30 @@ def _make_leaf(
         color_rgb=color,
         material_hint=mat_hint,
     )
+
+
+def _compose_location(
+    parent: object | None, child: object,
+) -> object:
+    """Compose two ``TopLoc_Location`` objects, handling a null parent."""
+    if parent is None:
+        return child
+    return parent.Multiplied(child)  # type: ignore[attr-defined]
+
+
+def _apply_location(shape: object, loc: object | None) -> object:
+    """Apply an accumulated ``TopLoc_Location`` to a shape.
+
+    Uses ``BRepBuilderAPI_Transform`` to bake the placement into the
+    geometry (same approach as pythonocc's ``read_step_file_with_names_colors``).
+    """
+    if loc is None or loc.IsIdentity():  # type: ignore[attr-defined]
+        return shape
+    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+
+    return BRepBuilderAPI_Transform(
+        shape, loc.Transformation(),  # type: ignore[attr-defined]
+    ).Shape()
 
 
 def _get_label_name(label: object) -> str | None:
