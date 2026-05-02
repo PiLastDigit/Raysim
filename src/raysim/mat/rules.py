@@ -1,7 +1,8 @@
 """Naming-rule auto-assignment engine — Phase B2.3.
 
-Matches solid identifiers (``solid_id``, ``path_key``, ``display_name``)
-against regex patterns and resolves to library ``group_id`` values.
+Matches solid identifiers (``solid_id``, ``path_key``, ``display_name``,
+``part_name``) against regex patterns and resolves to library ``group_id``
+values.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ class SolidRef:
     solid_id: str
     path_key: str
     display_name: str = ""
+    part_name: str = ""
 
     def __post_init__(self) -> None:
         if not self.display_name:
@@ -84,12 +86,12 @@ def apply_rules(
     """Evaluate *rules* against each solid's identifiers.
 
     For each solid, the pattern is tested against ``solid_id``, ``path_key``,
-    and ``display_name``. Highest-priority match wins. If 2+ rules at the
-    same priority both match, the solid is marked ambiguous.
+    ``display_name``, and ``part_name``. Highest-priority match wins. If 2+
+    rules at the same priority both match, the solid is marked ambiguous.
     """
     results: list[RuleMatch] = []
     for solid in solids:
-        targets = (solid.solid_id, solid.path_key, solid.display_name)
+        targets = (solid.solid_id, solid.path_key, solid.display_name, solid.part_name)
         hits: list[NamingRule] = []
         for rule in rules:
             if any(rule._compiled.search(t) for t in targets):

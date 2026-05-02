@@ -37,8 +37,8 @@ class TreePanel(QDockWidget):  # type: ignore[misc]
         self._viewer = viewer
 
         self._tree = QTreeWidget()
-        self._tree.setHeaderLabels(["Name", "Solid ID", "Material"])
-        self._tree.setColumnCount(3)
+        self._tree.setHeaderLabels(["Name", "Part", "Solid ID", "Material"])
+        self._tree.setColumnCount(4)
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._context_menu)
         self._tree.currentItemChanged.connect(self._on_selection_changed)
@@ -61,8 +61,8 @@ class TreePanel(QDockWidget):  # type: ignore[misc]
         root = self._state.assembly_root
         if root is None:
             return
-        self._add_node(root, None)
-        self._tree.expandAll()
+        root_item = self._add_node(root, None)
+        root_item.setExpanded(True)
         self._update_assignment_status()
 
     def _add_node(
@@ -70,13 +70,14 @@ class TreePanel(QDockWidget):  # type: ignore[misc]
     ) -> QTreeWidgetItem:
         if node.leaf is not None:
             display = node.leaf.name or node.leaf.solid_id
-            item = QTreeWidgetItem([display, node.leaf.solid_id, ""])
+            part = node.leaf.part_name or ""
+            item = QTreeWidgetItem([display, part, node.leaf.solid_id, ""])
             if node.leaf.color_rgb is not None:
                 r, g, b = node.leaf.color_rgb
                 item.setBackground(0, QBrush(QColor.fromRgbF(r, g, b)))
         else:
             display = node.name or node.path_key or "(root)"
-            item = QTreeWidgetItem([display, "", ""])
+            item = QTreeWidgetItem([display, "", "", ""])
 
         if parent_item is not None:
             parent_item.addChild(item)
@@ -95,18 +96,18 @@ class TreePanel(QDockWidget):  # type: ignore[misc]
         assignment_map = {a.solid_id: a.material_group_id for a in self._state.assignments}
         for solid_id, item in self._leaf_items.items():
             gid = assignment_map.get(solid_id, "")
-            item.setText(2, gid)
+            item.setText(3, gid)
             if gid:
-                item.setForeground(2, QBrush(QColor("green")))
+                item.setForeground(3, QBrush(QColor("green")))
             else:
-                item.setForeground(2, QBrush(QColor("red")))
+                item.setForeground(3, QBrush(QColor("red")))
 
     def _on_selection_changed(
         self, current: QTreeWidgetItem | None, _previous: QTreeWidgetItem | None,
     ) -> None:
         if current is None:
             return
-        solid_id = current.text(1)
+        solid_id = current.text(2)
         if solid_id:
             self._viewer.highlight_solid(solid_id)
 
@@ -114,7 +115,7 @@ class TreePanel(QDockWidget):  # type: ignore[misc]
         item = self._tree.currentItem()
         if item is None:
             return
-        solid_id = item.text(1)
+        solid_id = item.text(2)
         if not solid_id:
             return
 

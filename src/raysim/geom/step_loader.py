@@ -27,6 +27,7 @@ class LeafSolid:
     bbox_min_mm: tuple[float, float, float]
     bbox_max_mm: tuple[float, float, float]
     name: str | None = None
+    part_name: str | None = None
     color_rgb: tuple[float, float, float] | None = None
     material_hint: str | None = None
 
@@ -44,8 +45,9 @@ class AssemblyNode:
 def _xcaf_available() -> bool:
     """Check whether the XCAF document framework is available."""
     try:
-        from OCC.Core.BinXCAFDrivers import binxcafdrivers  # noqa: F401
-        from OCC.Core.TDocStd import TDocStd_Application  # noqa: F401
+        from OCC.Core.STEPCAFControl import STEPCAFControl_Reader  # noqa: F401
+        from OCC.Core.TDocStd import TDocStd_Document  # noqa: F401
+        from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool  # noqa: F401
         return True
     except ImportError:
         _LOG.info("step_loader.xcaf_imports_unavailable")
@@ -86,21 +88,16 @@ def load_step(path: str | Path) -> AssemblyNode:
 def _load_step_xcaf(path: Path) -> AssemblyNode:
     """Load via STEPCAFControl_Reader (XCAF — names, colors, material hints).
 
-    Uses ``TDocStd_Application`` + ``binxcafdrivers.DefineFormat`` instead
-    of the bare ``TDocStd_Document(TCollection_ExtendedString(...))``
-    constructor, which crashes in C++ on pythonocc-core 7.9.x Windows
-    (GitHub issue tpaviot/pythonocc-core#1428).
+    Tries pythonocc's own document format (``"pythonocc-doc-step-import"``)
+    first — this populates XCAF attributes (names, colors) correctly.
+    Falls back to the ``TDocStd_Application`` + ``BinXCAFDrivers`` pattern
+    (issue tpaviot/pythonocc-core#1428 workaround) if the primary path fails.
     """
-    from OCC.Core.BinXCAFDrivers import binxcafdrivers
     from OCC.Core.IFSelect import IFSelect_RetDone
     from OCC.Core.STEPCAFControl import STEPCAFControl_Reader
-    from OCC.Core.TDocStd import TDocStd_Application, TDocStd_Document
     from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
 
-    app = TDocStd_Application()
-    binxcafdrivers.DefineFormat(app)
-    handle = TDocStd_Document("BinXCAF")
-    app.NewDocument("BinXCAF", handle)
+    doc = _create_xcaf_document()
 
     reader = STEPCAFControl_Reader()
     reader.SetColorMode(True)
@@ -111,13 +108,43 @@ def _load_step_xcaf(path: Path) -> AssemblyNode:
     if status != IFSelect_RetDone:
         raise ValueError(f"STEP read failed (status {status}): {path}")
 
-    reader.Transfer(handle)
+    reader.Transfer(doc)
 
-    shape_tool = XCAFDoc_DocumentTool.ShapeTool(handle.Main())
-    color_tool = XCAFDoc_DocumentTool.ColorTool(handle.Main())
-    mat_tool = XCAFDoc_DocumentTool.MaterialTool(handle.Main())
+    shape_tool = XCAFDoc_DocumentTool.ShapeTool(doc.Main())  # type: ignore[attr-defined]
+    color_tool = XCAFDoc_DocumentTool.ColorTool(doc.Main())  # type: ignore[attr-defined]
+    mat_tool = XCAFDoc_DocumentTool.MaterialTool(doc.Main())  # type: ignore[attr-defined]
 
     return _build_tree_xcaf(shape_tool, color_tool, mat_tool)
+
+
+def _create_xcaf_document() -> object:
+    """Create an XCAF document for STEPCAFControl_Reader.Transfer.
+
+    Primary: ``TDocStd_Document("pythonocc-doc-step-import")`` — the same
+    pattern pythonocc's own ``read_step_file_with_names_colors`` uses.
+    This correctly populates TDataStd_Name attributes on labels.
+
+    Fallback: ``TDocStd_Application`` + ``BinXCAFDrivers`` — the #1428
+    workaround.  Works for geometry but may not populate name attributes.
+    """
+    from OCC.Core.TDocStd import TDocStd_Document
+
+    try:
+        doc = TDocStd_Document("pythonocc-doc-step-import")
+        _LOG.info("step_loader.xcaf_doc_created", method="pythonocc-doc")
+        return doc
+    except Exception as exc:
+        _LOG.debug("step_loader.pythonocc_doc_failed", error=str(exc))
+
+    from OCC.Core.BinXCAFDrivers import binxcafdrivers
+    from OCC.Core.TDocStd import TDocStd_Application
+
+    app = TDocStd_Application()
+    binxcafdrivers.DefineFormat(app)
+    doc = TDocStd_Document("BinXCAF")
+    app.NewDocument("BinXCAF", doc)
+    _LOG.info("step_loader.xcaf_doc_created", method="BinXCAFDrivers")
+    return doc
 
 
 def _load_step_plain(path: Path) -> AssemblyNode:
@@ -223,12 +250,21 @@ def _walk_label(
     *,
     _prefix: str,
     _counter: list[int],
+    _instance_name: str | None = None,
 ) -> AssemblyNode:
-    """Recursively walk one XCAF label into an AssemblyNode."""
+    """Recursively walk one XCAF label into an AssemblyNode.
+
+    ``_instance_name`` is the component/reference label's name (e.g. "R41"),
+    passed by the parent when following a reference.  The label's own name
+    (e.g. "R_0402_1005Metric") is the prototype/part-definition name.
+    Instance name takes priority for display; prototype becomes ``part_name``.
+    """
     from OCC.Core.TDF import TDF_LabelSequence
     from OCC.Core.TopAbs import TopAbs_COMPOUND, TopAbs_COMPSOLID, TopAbs_SOLID
 
-    label_name = _get_label_name(label)
+    proto_name = _get_label_name(label)
+    label_name = _instance_name or proto_name
+    part_name = proto_name if _instance_name else None
 
     if shape_tool.IsAssembly(label):  # type: ignore[attr-defined]
         children: list[AssemblyNode] = []
@@ -237,7 +273,9 @@ def _walk_label(
         for i in range(components.Length()):
             comp_label = components.Value(i + 1)
             ref_label = comp_label
+            comp_name: str | None = None
             if shape_tool.IsReference(comp_label):  # type: ignore[attr-defined]
+                comp_name = _get_label_name(comp_label)
                 from OCC.Core.TDF import TDF_Label
                 ref = TDF_Label()
                 shape_tool.GetReferredShape(comp_label, ref)  # type: ignore[attr-defined]
@@ -247,6 +285,7 @@ def _walk_label(
                 _walk_label(
                     ref_label, shape_tool, color_tool, mat_tool,
                     _prefix=child_prefix, _counter=_counter,
+                    _instance_name=comp_name,
                 )
             )
         return AssemblyNode(
@@ -261,12 +300,14 @@ def _walk_label(
             if shape_type == TopAbs_SOLID:
                 return _make_leaf_node(
                     shape, label, shape_tool, color_tool, mat_tool,
-                    _prefix=_prefix, _counter=_counter, label_name=label_name,
+                    _prefix=_prefix, _counter=_counter,
+                    label_name=label_name, part_name=part_name,
                 )
             if shape_type in (TopAbs_COMPOUND, TopAbs_COMPSOLID):
                 return _walk_compound(
                     shape, label, shape_tool, color_tool, mat_tool,
-                    _prefix=_prefix, _counter=_counter, label_name=label_name,
+                    _prefix=_prefix, _counter=_counter,
+                    label_name=label_name, part_name=part_name,
                 )
 
     return AssemblyNode(path_key=_prefix, children=(), leaf=None, name=label_name)
@@ -282,6 +323,7 @@ def _walk_compound(
     _prefix: str,
     _counter: list[int],
     label_name: str | None,
+    part_name: str | None = None,
 ) -> AssemblyNode:
     """Walk a compound/compsolid shape, extracting child solids."""
     from OCC.Core.TopAbs import TopAbs_SOLID
@@ -297,7 +339,8 @@ def _walk_compound(
             solid = topods.Solid(child)
             leaf = _make_leaf(
                 solid, color_tool, mat_tool, label,
-                _prefix=child_prefix, _counter=_counter, label_name=None,
+                _prefix=child_prefix, _counter=_counter,
+                label_name=label_name, part_name=part_name,
             )
             children.append(
                 AssemblyNode(path_key=child_prefix, children=(), leaf=leaf)
@@ -306,7 +349,8 @@ def _walk_compound(
             children.append(
                 _walk_compound(
                     child, label, shape_tool, color_tool, mat_tool,
-                    _prefix=child_prefix, _counter=_counter, label_name=None,
+                    _prefix=child_prefix, _counter=_counter,
+                    label_name=label_name, part_name=part_name,
                 )
             )
         child_idx += 1
@@ -328,6 +372,7 @@ def _make_leaf_node(
     _prefix: str,
     _counter: list[int],
     label_name: str | None,
+    part_name: str | None = None,
 ) -> AssemblyNode:
     """Create a leaf AssemblyNode for a single solid."""
     from OCC.Core.TopoDS import topods
@@ -335,7 +380,8 @@ def _make_leaf_node(
     solid = topods.Solid(shape)
     leaf = _make_leaf(
         solid, color_tool, mat_tool, label,
-        _prefix=_prefix, _counter=_counter, label_name=label_name,
+        _prefix=_prefix, _counter=_counter,
+        label_name=label_name, part_name=part_name,
     )
     return AssemblyNode(path_key=_prefix, children=(), leaf=leaf, name=label_name)
 
@@ -349,6 +395,7 @@ def _make_leaf(
     _prefix: str,
     _counter: list[int],
     label_name: str | None,
+    part_name: str | None = None,
 ) -> LeafSolid:
     """Create a LeafSolid with bbox, color, and material hint."""
     from OCC.Core.Bnd import Bnd_Box
@@ -371,23 +418,38 @@ def _make_leaf(
         bbox_min_mm=(xmin, ymin, zmin),
         bbox_max_mm=(xmax, ymax, zmax),
         name=label_name,
+        part_name=part_name,
         color_rgb=color,
         material_hint=mat_hint,
     )
 
 
 def _get_label_name(label: object) -> str | None:
-    """Extract the name attribute from an XCAF label."""
-    from OCC.Core.TDataStd import TDataStd_Name
+    """Extract the name attribute from an XCAF label.
 
-    name_attr = TDataStd_Name()
+    Uses ``TDF_Label.GetLabelName()`` (the same method pythonocc's own
+    ``read_step_file_with_names_colors`` uses).  Falls back to the
+    ``TDataStd_Name`` attribute lookup if ``GetLabelName`` is unavailable.
+    """
     try:
+        name = label.GetLabelName()  # type: ignore[attr-defined]
+        if name:
+            s = str(name).strip()
+            if s:
+                return s
+    except Exception:
+        pass
+
+    try:
+        from OCC.Core.TDataStd import TDataStd_Name
+
+        name_attr = TDataStd_Name()
         if label.FindAttribute(TDataStd_Name.GetID(), name_attr):  # type: ignore[attr-defined]
             text = name_attr.Get()
             if text:
-                s = str(text.ToExtString()) if hasattr(text, "ToExtString") else str(text)
-                if s.strip():
-                    return s.strip()
+                s = str(text).strip()
+                if s:
+                    return s
     except Exception:
         pass
     return None

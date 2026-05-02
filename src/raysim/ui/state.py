@@ -294,6 +294,7 @@ class AppState(QObject):  # type: ignore[misc]
                 solid_id=leaf.solid_id,
                 path_key=leaf.path_key,
                 display_name=leaf.name or leaf.solid_id,
+                part_name=leaf.part_name or "",
             )
             for leaf in self._leaves
         ]

@@ -2,6 +2,7 @@
 
 | Version | Week | Commit Message |
 | ------- | ---- | -------------- |
+| `0.3.1` | 1    | Fix XCAF name extraction, add instance/prototype name columns to assembly tree |
 | `0.3.0` | 1    | Add Phase B3 UI + authoring: XCAF migration, PySide6 app, panels, overlays, run dispatch |
 | `0.2.0` | 1    | Add Phase B2 materials + project file: library, rules, STEP tags, review, gating, .raysim format |
 | `0.1.0` | 1    | Add Phase B1 geometry pipeline: STEP loader, tessellation, healing, overlap, adapter |
@@ -10,6 +11,12 @@
 ---
 
 # Changelog Summary
+
+- **v0.3.1 (XCAF Name Fix — Week 1, 01-05-2026)**:
+  Fixed broken XCAF label name extraction (`GetLabelName()` replaces
+  `FindAttribute`). Separated instance names ("R41") from prototype names
+  ("R_0402_1005Metric") into `LeafSolid.name` and `LeafSolid.part_name`.
+  Assembly tree gains "Part" column. Naming rules match both names.
 
 - **v0.3.0 (Phase B3 UI + Authoring — Week 1, 30-04-2026)**:
   - **XCAF migration**: `step_loader` migrated to `STEPCAFControl_Reader`.

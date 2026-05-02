@@ -1,0 +1,64 @@
+aluminum_box.step:
+- bbox_max_mm:
+  - 50.0000001
+  - 50.0000001
+  - 50.0000001
+  bbox_min_mm:
+  - -50.0000001
+  - -50.0000001
+  - -50.0000001
+  path_key: '0'
+  solid_id: solid_0000
+concentric_shell.step:
+- bbox_max_mm:
+  - 50.0000001
+  - 50.0000001
+  - 50.0000001
+  bbox_min_mm:
+  - -50.0000001
+  - -50.0000001
+  - -50.0000001
+  path_key: 0/0
+  solid_id: solid_0000
+- bbox_max_mm:
+  - 20.0000001
+  - 20.0000001
+  - 20.0000001
+  bbox_min_mm:
+  - -20.0000001
+  - -20.0000001
+  - -20.0000001
+  path_key: 0/1
+  solid_id: solid_0001
+hollow_box.step:
+- bbox_max_mm:
+  - 50.0000001
+  - 50.0000001
+  - 50.0000001
+  bbox_min_mm:
+  - -50.0000001
+  - -50.0000001
+  - -50.0000001
+  path_key: '0'
+  solid_id: solid_0000
+nested_pin.step:
+- bbox_max_mm:
+  - 50.0000001
+  - 50.0000001
+  - 50.0000001
+  bbox_min_mm:
+  - -50.0000001
+  - -50.0000001
+  - -50.0000001
+  path_key: 0/0
+  solid_id: solid_0000
+- bbox_max_mm:
+  - 10.0000001
+  - 10.0000001
+  - 25.0000001
+  bbox_min_mm:
+  - -10.0000001
+  - -10.0000001
+  - -25.0000001
+  path_key: 0/1
+  solid_id: solid_0001

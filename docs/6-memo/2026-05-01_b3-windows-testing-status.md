@@ -102,7 +102,7 @@ UI testing on Windows.
 
 ## Next steps
 
-1. Fix XCAF label name extraction (issue 1 above)
+1. ~~Fix XCAF label name extraction (issue 1 above)~~ — **Fixed in v0.3.1**: `GetLabelName()` + instance/prototype separation
 2. Fix Mesa/viewport rendering (issue 2 above)
 3. Once both fixed: test full flow (open STEP → assign materials → place detectors → load .dos → run → view results)
 4. Push and verify CI
