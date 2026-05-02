@@ -6,6 +6,7 @@ land alongside in their own modules.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 
@@ -13,6 +14,14 @@ if sys.platform == "win32":
     _env_root = os.path.dirname(sys.executable)
     _dll_path = os.path.join(_env_root, "Library", "bin")
     if os.path.isdir(_dll_path):
+        # Mesa's opengl32.dll (from conda mesalib) shadows the system GPU
+        # driver when loaded from the same directory as OCCT's TKOpenGl.dll.
+        # Rename it so the system AMD/NVIDIA driver is used instead.
+        _mesa_gl = os.path.join(_dll_path, "opengl32.dll")
+        _mesa_bak = _mesa_gl + ".mesa-backup"
+        if os.path.isfile(_mesa_gl) and not os.path.isfile(_mesa_bak):
+            with contextlib.suppress(OSError):
+                os.rename(_mesa_gl, _mesa_bak)
         os.add_dll_directory(_dll_path)
         os.environ["PATH"] = _dll_path + ";" + os.environ.get("PATH", "")
 

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 if TYPE_CHECKING:
@@ -35,6 +36,11 @@ class ViewerWidget(QWidget):  # type: ignore[misc]
         self._solid_ais: dict[str, object] = {}
         self._snap_mode: str = "centroid"
 
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if self._display is not None:
+            self._display.View.MustBeResized()
+
     def init_viewer(self) -> None:
         """Create the OCCT viewer and initialize OpenGL (call after show)."""
         if self._viewer is not None:
@@ -49,6 +55,15 @@ class ViewerWidget(QWidget):  # type: ignore[misc]
         self._viewer.InitDriver()
         self._display = self._viewer._display
         self._setup_selection_callback()
+
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, self._deferred_resize)
+
+    def _deferred_resize(self) -> None:
+        """Force OCCT to pick up the actual widget size after layout settles."""
+        if self._display is not None:
+            self._display.View.MustBeResized()
+            self._display.FitAll()
 
     def _setup_selection_callback(self) -> None:
         """Register click handler for solid selection and face-centroid picking."""

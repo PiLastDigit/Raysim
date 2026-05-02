@@ -220,6 +220,13 @@ def _setup_conda_dll_path() -> None:
     env_root = os.path.dirname(sys.executable)
     dll_path = os.path.join(env_root, "Library", "bin")
     if os.path.isdir(dll_path):
+        import contextlib
+
+        mesa_gl = os.path.join(dll_path, "opengl32.dll")
+        mesa_bak = mesa_gl + ".mesa-backup"
+        if os.path.isfile(mesa_gl) and not os.path.isfile(mesa_bak):
+            with contextlib.suppress(OSError):
+                os.rename(mesa_gl, mesa_bak)
         os.add_dll_directory(dll_path)
         os.environ["PATH"] = dll_path + ";" + os.environ.get("PATH", "")
 
