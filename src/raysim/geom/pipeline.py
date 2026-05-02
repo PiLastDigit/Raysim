@@ -13,7 +13,7 @@ from pathlib import Path
 import structlog
 
 from raysim.geom.healing import HealedSolid, heal_assembly
-from raysim.geom.overlap import OverlapReport, diagnose_overlaps
+from raysim.geom.overlap import ContactReport, OverlapReport, extract_contacts
 from raysim.geom.step_loader import iter_leaves, load_step
 from raysim.geom.tessellation import tessellate
 from raysim.geom.watertightness import WatertightnessReport, validate_watertightness
@@ -39,7 +39,8 @@ class ValidatedAssembly:
     angular_rad: float
     solids: tuple[HealedSolid, ...]
     watertightness: WatertightnessReport
-    overlaps: OverlapReport
+    contacts: ContactReport
+    overlaps: OverlapReport | None = None
     overrides_used: ValidationOverrides = field(default_factory=ValidationOverrides)
 
 
@@ -71,15 +72,16 @@ def build_assembly_from_step(
     # B1.4: Watertightness validation.
     wt_report = validate_watertightness(healed)
 
-    # B1.5: Overlap diagnostic (pass original shapes for volume classification).
-    shape_map = {leaf.solid_id: leaf.shape for leaf in leaves}
-    overlap_report = diagnose_overlaps(healed, shapes=shape_map)
+    # B1.5 (fast path): Contact extraction — tied pairs + mismatched contacts.
+    # Full overlap diagnostic (volume classification) is on-demand via
+    # ``raysim validate`` or the UI's "Validate Geometry" button.
+    contact_report = extract_contacts(healed)
 
     _LOG.info(
         "pipeline.done",
         n_solids=len(healed),
         watertight=wt_report.is_watertight(),
-        n_overlap_pairs=len(overlap_report.pairs),
+        n_tied=len(contact_report.tied_pairs),
     )
 
     return ValidatedAssembly(
@@ -88,5 +90,5 @@ def build_assembly_from_step(
         angular_rad=angular_rad,
         solids=healed,
         watertightness=wt_report,
-        overlaps=overlap_report,
+        contacts=contact_report,
     )

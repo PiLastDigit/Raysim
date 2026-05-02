@@ -59,6 +59,9 @@ class RunContext:
     assignments_hash: str
     detectors_hash: str
     dose_curve_hash: str
+    human_metadata_path: Path | None = None
+    overlap_validated: bool = False
+    overlap_summary: dict[str, int] | None = None
 
 
 class RunWorker(QThread):  # type: ignore[misc]
@@ -122,6 +125,24 @@ class RunWorker(QThread):  # type: ignore[misc]
                 self._ctx.output_path.parent.mkdir(parents=True, exist_ok=True)
                 self._ctx.output_path.write_text(
                     canonical_dumps(run_result), encoding="utf-8",
+                )
+
+            human_path = self._ctx.human_metadata_path
+            if human_path is None and self._ctx.output_path is not None:
+                human_path = self._ctx.output_path.with_suffix(".human.json")
+            if human_path is not None:
+                import json
+                from datetime import UTC, datetime
+
+                human_meta: dict[str, object] = {
+                    "timestamp_utc": datetime.now(tz=UTC).isoformat(),
+                    "raysim_version": __version__,
+                    "overlap_validation": "validated" if self._ctx.overlap_validated else "skipped",
+                }
+                if self._ctx.overlap_summary is not None:
+                    human_meta["overlap_report_summary"] = self._ctx.overlap_summary
+                human_path.write_text(
+                    json.dumps(human_meta, indent=2), encoding="utf-8",
                 )
 
             self.run_complete.emit(run_result)

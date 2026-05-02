@@ -240,12 +240,16 @@ Group triangles by their source `TopoDS_Shell`. For each closed shell: every non
 ### B1.5 — Overlap and interference diagnostic
 Watertight shells are necessary but not sufficient. Real STEP assemblies frequently contain coincident faces, nested solids, and small interferences that produce wrong ∑ρL even with perfect watertightness. This step adds a separate diagnostic pass and **classifies each detected pair into one of four physical categories** so that the run gate's accept/reject logic is informed, not just a boolean.
 
-**Detection passes:**
+**Two-tier design (v0.4.0):** The diagnostic is split into a fast mandatory path and a slow on-demand path:
+- **Fast path (`extract_contacts`)**: AABB filter + triangle-level vertex-match tied pairing + mismatched-contact detection. Runs in the mandatory pipeline. Returns `ContactReport` with tied pairs (needed by the ray engine, ARCHI §11) and mismatched contacts (gated by the adapter).
+- **Full path (`diagnose_overlaps`)**: Calls the same triangle matching plus O(N²) OCCT volume-intersection classification. On-demand via `raysim validate` CLI or "Validate Geometry" UI button. Returns `OverlapReport` with four-way pair classification.
+
+**Detection passes** (full path only for volume classification):
 - **Coincident-face detection.** Triangle pairs from different solids whose centroids and normals coincide within tolerance.
 - **Solid-solid interference.** AABB overlap test followed by an OCCT `BOPAlgo_CheckerSI`-style intersection check on candidate pairs. Computes intersection volume.
 - **Nested-solid detection.** A solid wholly inside another (e.g., a connector pin inside a socket cavity).
 
-**Pair classification** (mutually exclusive):
+**Pair classification** (mutually exclusive, full path only):
 | Status | Physical meaning | Stack accumulator behavior | Default gate action |
 |---|---|---|---|
 | `contact_only` | Touching faces, zero intersection volume; coincident triangles share a face but neither solid is inside the other | A.4 tie batch transitions A→B cleanly | Accept silently |

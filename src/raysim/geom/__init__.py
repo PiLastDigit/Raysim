@@ -20,12 +20,14 @@ from raysim.geom.overlap import (
     VERTEX_MATCH_TOL_REL,
     ZERO_VOLUME_REL,
     BooleanFailure,
+    ContactReport,
     MismatchedContactRegion,
     OverlapPair,
     OverlapReport,
     OverlapStatus,
     TiedTrianglePair,
     diagnose_overlaps,
+    extract_contacts,
 )
 from raysim.geom.pipeline import ValidatedAssembly, ValidationOverrides, build_assembly_from_step
 from raysim.geom.step_loader import AssemblyNode, LeafSolid, iter_leaves, load_step
@@ -45,6 +47,7 @@ __all__ = [
     "ZERO_VOLUME_REL",
     "AssemblyNode",
     "BooleanFailure",
+    "ContactReport",
     "ExportedSolid",
     "GeomValidationError",
     "HealedShell",
@@ -66,6 +69,7 @@ __all__ = [
     "build_scene_from_step",
     "diagnose_overlaps",
     "export_assembly_to_stl",
+    "extract_contacts",
     "flatten_index",
     "heal_assembly",
     "iter_leaves",
