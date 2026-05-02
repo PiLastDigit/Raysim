@@ -7,14 +7,13 @@ land alongside in their own modules.
 from __future__ import annotations
 
 import os
-import platform
 import sys
 
-if platform.system() == "Windows":
+if sys.platform == "win32":
     _env_root = os.path.dirname(sys.executable)
     _dll_path = os.path.join(_env_root, "Library", "bin")
     if os.path.isdir(_dll_path):
-        os.add_dll_directory(_dll_path)  # type: ignore[attr-defined]
+        os.add_dll_directory(_dll_path)
         os.environ["PATH"] = _dll_path + ";" + os.environ.get("PATH", "")
 
 import click
