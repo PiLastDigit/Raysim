@@ -106,6 +106,10 @@ Read `docs/ARCHI.md` before touching code that spans modules. The short version:
 5. **Pre-built tied groups are mandatory.** embreex 4.4 has no filter callback, so coincident-face handling uses pre-built groups at scene build time.
 6. **Float64 accumulation outside Embree.** Embree returns float32 hit distances; the chord-length accumulator runs in float64 on the Python side.
 
+## Markdown formatting
+
+**Never hard-wrap markdown prose.** Write each paragraph, bullet point, or sentence as a single long line. Let the editor soft-wrap. Do NOT insert newlines at 70-80 characters to fit a column width. Only break lines at paragraph boundaries, list items, headings, or code blocks.
+
 ## Coding conventions
 
 - `ruff` for linting, `mypy --strict` for type checking. Both must be clean before committing.
